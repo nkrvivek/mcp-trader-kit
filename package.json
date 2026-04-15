@@ -10,6 +10,10 @@
   "scripts": {
     "build": "npm run -ws build",
     "test": "npm run -ws test",
-    "typecheck": "npm run -ws typecheck"
+    "typecheck": "npm run -ws typecheck",
+    "smoke": "tsx scripts/live-trade-smoke.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
   }
 }
