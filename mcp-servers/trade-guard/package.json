@@ -9,6 +9,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],
+  "publishConfig": { "access": "public" },
+  "repository": { "type": "git", "url": "git+https://github.com/nkrvivek/mcp-trader-kit.git", "directory": "mcp-servers/trade-guard" },
+  "keywords": ["mcp", "trading", "snaptrade", "claude", "risk-gate", "wash-sale"],
+  "homepage": "https://github.com/nkrvivek/mcp-trader-kit",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

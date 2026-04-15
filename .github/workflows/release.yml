@@ -1,0 +1,15 @@
+name: Release trade-guard-mcp
+on:
+  push:
+    tags: ["trade-guard-v*"]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, registry-url: "https://registry.npmjs.org" }
+      - run: npm ci
+      - run: npm run -w trade-guard-mcp build
+      - run: npm publish -w trade-guard-mcp --access public
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
