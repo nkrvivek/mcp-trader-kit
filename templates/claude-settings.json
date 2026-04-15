@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "trade-guard": { "command": "npx", "args": ["-y", "trade-guard-mcp"] },
+    "snaptrade-trade": { "command": "npx", "args": ["-y", "snaptrade-trade-mcp"] },
+    "snaptrade-read": { "command": "npx", "args": ["-y", "snaptrade-mcp-ts"] }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__snaptrade-trade__equity_force_place|mcp__snaptrade-trade__equity_confirm|mcp__snaptrade-trade__mleg_place|mcp__snaptrade-trade__cancel_order",
+        "command": "node ${HOME}/.mcp-trader-kit/scripts/pre-tool-use.js",
+        "description": "Enforce trade-guard risk gates"
+      }
+    ]
+  }
+}
