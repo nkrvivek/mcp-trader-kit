@@ -2,6 +2,7 @@
   "name": "mcp-trader-kit",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Packaged Claude-Code-as-trading-terminal setup with risk-gated MCP trading.",
   "license": "MIT",
   "engines": { "node": ">=20" },
