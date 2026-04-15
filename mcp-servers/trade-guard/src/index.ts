@@ -1,3 +1,73 @@
 #!/usr/bin/env node
-console.error("trade-guard-mcp: not yet implemented");
-process.exit(1);
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { loadAllProfiles } from "./profiles/loader.js";
+import { KIT_ROOT, PROFILES_DIR } from "./config.js";
+import { connectSnaptradeRead, type SnaptradeReadClient } from "./mcp/snaptrade-read-client.js";
+import { CheckTradeArgs, checkTradeHandler } from "./tools/check-trade.js";
+import { CheckWashSaleArgs, checkWashSaleHandler } from "./tools/check-wash-sale.js";
+import { listProfilesHandler } from "./tools/list-profiles.js";
+import { SetProfileArgs, setProfileHandler } from "./tools/set-profile.js";
+import { redact } from "./redact.js";
+
+const TOOLS = [
+  { name: "check_trade", description: "Gate a proposed trade (caps + wash-sale).",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: CheckTradeArgs.shape as any, required: ["profile", "tool", "ticker", "direction", "qty", "notional_usd"] } },
+  { name: "check_wash_sale", description: "Check wash-sale status for a ticker + action.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: CheckWashSaleArgs.shape as any, required: ["ticker", "action", "tax_entity"] } },
+  { name: "list_profiles", description: "List available trading profiles.",
+    inputSchema: { type: "object", additionalProperties: false, properties: {} } },
+  { name: "set_profile", description: "Set the active profile in session state.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: SetProfileArgs.shape as any, required: ["name"] } },
+];
+
+const SECRETS = [
+  process.env.SNAPTRADE_CONSUMER_KEY, process.env.SNAPTRADE_USER_SECRET,
+  process.env.SNAPTRADE_USER_ID, process.env.SNAPTRADE_CLIENT_ID,
+].filter((x): x is string => !!x);
+
+async function main() {
+  const allProfiles = await loadAllProfiles(PROFILES_DIR).catch(() => []);
+  let snaptradeRead: SnaptradeReadClient | null = null;
+  if (process.env.SNAPTRADE_READ_COMMAND) {
+    try {
+      snaptradeRead = await connectSnaptradeRead({
+        command: process.env.SNAPTRADE_READ_COMMAND,
+        args: (process.env.SNAPTRADE_READ_ARGS ?? "").split(" ").filter(Boolean),
+        env: process.env as Record<string, string>,
+      });
+    } catch (e) {
+      process.stderr.write(`trade-guard: could not start snaptrade-read: ${(e as Error).message}\n`);
+    }
+  }
+
+  const server = new Server({ name: "trade-guard", version: "0.1.0" }, { capabilities: { tools: {} } });
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const deps = { allProfiles, snaptradeRead };
+    try {
+      let result: unknown;
+      switch (req.params.name) {
+        case "check_trade":     result = await checkTradeHandler(req.params.arguments, deps); break;
+        case "check_wash_sale": result = await checkWashSaleHandler(req.params.arguments, deps); break;
+        case "list_profiles":   result = await listProfilesHandler(req.params.arguments, deps); break;
+        case "set_profile":     result = await setProfileHandler(req.params.arguments, deps); break;
+        default: throw new Error(`unknown tool: ${req.params.name}`);
+      }
+      const safe = redact(result, SECRETS);
+      return { content: [{ type: "text", text: JSON.stringify(safe, null, 2) }] };
+    } catch (e) {
+      const msg = (e as Error).message;
+      const safeMsg = String(redact(msg, SECRETS));
+      return { content: [{ type: "text", text: `error: ${safeMsg}` }], isError: true };
+    }
+  });
+  await server.connect(new StdioServerTransport());
+  process.stderr.write(`trade-guard: ready (profiles=${allProfiles.length}, kit_root=${KIT_ROOT})\n`);
+}
+
+main().catch((e) => { process.stderr.write(`trade-guard fatal: ${e?.message}\n`); process.exit(1); });
