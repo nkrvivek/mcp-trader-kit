@@ -1,0 +1,14 @@
+{
+  "name": "mcp-trader-kit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Packaged Claude-Code-as-trading-terminal setup with risk-gated MCP trading.",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "workspaces": ["mcp-servers/*"],
+  "scripts": {
+    "build": "npm run -ws build",
+    "test": "npm run -ws test",
+    "typecheck": "npm run -ws typecheck"
+  }
+}
