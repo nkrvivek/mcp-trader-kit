@@ -57,7 +57,7 @@ EOF
 fi
 
 say "Installing MCP packages (this may take a minute)"
-npm install -g traderkit-guard snaptrade-trade-mcp snaptrade-mcp-ts 2>/dev/null || \
+npm install -g traderkit snaptrade-trade-mcp snaptrade-mcp-ts 2>/dev/null || \
   echo "  (global install skipped — using 'npx -y' on demand is fine)"
 
 say "Next steps"

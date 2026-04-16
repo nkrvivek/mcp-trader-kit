@@ -29,7 +29,7 @@ See [SETUP.md](SETUP.md) for the full walkthrough.
 
 ## Architecture
 
-One MCP (`traderkit-guard`) + one PreToolUse hook + markdown profiles + a vault template. Works with Claude Code; other MCP clients supported with a bit of wiring (see `docs/`).
+One MCP (`traderkit`) + one PreToolUse hook + markdown profiles + a vault template. Works with Claude Code; other MCP clients supported with a bit of wiring (see `docs/`).
 
 ## Tested brokers
 

@@ -29,8 +29,8 @@ if [[ "$count" -ge 1 ]]; then pass "profiles" "$count profile(s)"; else fail "pr
 # hook script
 if [[ -x "$KIT_ROOT/scripts/pre-tool-use.js" ]]; then pass "hook-script" "executable"; else fail "hook-script" "missing or not executable"; fi
 
-# traderkit-guard binary
-if command -v traderkit-guard >/dev/null 2>&1; then pass "traderkit-guard" "$(which traderkit-guard)"; else skip "traderkit-guard" "not globally installed (npx -y will resolve)"; fi
+# traderkit binary
+if command -v traderkit >/dev/null 2>&1; then pass "traderkit" "$(which traderkit)"; else skip "traderkit" "not globally installed (npx -y will resolve)"; fi
 
 # snaptrade-trade-mcp
 if command -v snaptrade-trade-mcp >/dev/null 2>&1; then pass "snaptrade-trade-mcp" "installed"; else skip "snaptrade-trade-mcp" "not globally installed"; fi

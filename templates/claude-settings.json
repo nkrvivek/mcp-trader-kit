@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "trade-guard": { "command": "npx", "args": ["-y", "traderkit-guard"] },
+    "trade-guard": { "command": "npx", "args": ["-y", "traderkit"] },
     "snaptrade-trade": { "command": "npx", "args": ["-y", "snaptrade-trade-mcp"] },
     "snaptrade-read": { "command": "npx", "args": ["-y", "snaptrade-mcp-ts"] }
   },

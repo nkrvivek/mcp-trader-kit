@@ -31,7 +31,7 @@ function blocked(reason) {
 
 async function callCheckTrade(payload) {
   return new Promise((resolve, reject) => {
-    const child = spawn("npx", ["-y", "traderkit-guard"], { stdio: ["pipe", "pipe", "inherit"] });
+    const child = spawn("npx", ["-y", "traderkit"], { stdio: ["pipe", "pipe", "inherit"] });
     let out = "";
     child.stdout.on("data", (c) => { out += c; });
     child.on("close", () => {

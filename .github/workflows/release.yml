@@ -1,7 +1,7 @@
-name: Release traderkit-guard
+name: Release traderkit
 on:
   push:
-    tags: ["guard-v*"]
+    tags: ["v*"]
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -12,6 +12,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
       - run: npm ci
-      - run: npm run -w traderkit-guard build
-      - run: npm publish -w traderkit-guard --access public
+      - run: npm run -w mcp-servers/trade-guard build
+      - run: npm publish -w mcp-servers/trade-guard --access public
         env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }

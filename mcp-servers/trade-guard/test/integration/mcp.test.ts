@@ -8,7 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const DIST_INDEX = fileURLToPath(new URL("../../dist/index.js", import.meta.url));
 
-describe("traderkit-guard stdio integration", () => {
+describe("traderkit stdio integration", () => {
   let kitRoot: string;
   let client: Client | undefined;
 

@@ -66,7 +66,7 @@ cd <vault>
 claude
 ```
 
-On first turn, Claude will read CLAUDE.md + the vault, ask which profile to use, and load context. Ask "list profiles" to confirm traderkit-guard is wired.
+On first turn, Claude will read CLAUDE.md + the vault, ask which profile to use, and load context. Ask "list profiles" to confirm traderkit is wired.
 
 ## Step 7: First trade (paper or sandbox only)
 
@@ -75,5 +75,5 @@ Try: "list positions in `<profile>`", then a small proposal. Verify the hook fir
 ## Troubleshooting
 
 - **Hook never fires:** check `.claude/settings.json` matcher pattern — tool names must start with `mcp__<server-name>__<tool-name>`.
-- **Wash-sale check always returns unavailable:** confirm `SNAPTRADE_READ_COMMAND=npx SNAPTRADE_READ_ARGS="-y snaptrade-mcp-ts"` is in the env when traderkit-guard launches (Claude Code inherits the project env).
+- **Wash-sale check always returns unavailable:** confirm `SNAPTRADE_READ_COMMAND=npx SNAPTRADE_READ_ARGS="-y snaptrade-mcp-ts"` is in the env when traderkit launches (Claude Code inherits the project env).
 - **Profile not found:** `trade-guard.list_profiles` should show the file name (without `.md`) — if empty, verify YAML frontmatter parses and `TRADERKIT_ROOT` points where you think.
