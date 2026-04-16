@@ -1,4 +1,4 @@
-# mcp-trader-kit
+# traderkit
 
 Packaged Claude-Code-as-trading-terminal setup. Clone, run `./scripts/setup.sh`, get:
 
@@ -15,12 +15,12 @@ This software places real orders against real brokerage accounts. The authors di
 ## Quickstart
 
 ```bash
-git clone https://github.com/nkrvivek/mcp-trader-kit
-cd mcp-trader-kit
+git clone https://github.com/nkrvivek/traderkit
+cd traderkit
 npm install
 ./scripts/setup.sh
-# edit ~/.mcp-trader-kit/.env with credentials
-# edit ~/.mcp-trader-kit/profiles/*.md with your account_ids
+# edit ~/.traderkit/.env with credentials
+# edit ~/.traderkit/profiles/*.md with your account_ids
 ./scripts/doctor.sh
 cd vault && claude
 ```

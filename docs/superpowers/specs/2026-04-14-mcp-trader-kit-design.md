@@ -1,15 +1,15 @@
 ---
-title: mcp-trader-kit — design spec
-project: mcp-trader-kit
+title: traderkit — design spec
+project: traderkit
 version: 0.1.0-draft
 created: 2026-04-14
 updated: 2026-04-14
 status: approved (pending final user review)
-supersedes: 2026-04-14-clitrader-design.md
+supersedes: 2026-04-14-traderkit-cli-design.md
 tags: [#trading, #mcp, #oss, #setup-pack]
 ---
 
-# mcp-trader-kit — packaged AI-assisted trading setup
+# traderkit — packaged AI-assisted trading setup
 
 ## 1. Purpose
 
@@ -32,7 +32,7 @@ Ship the author's Claude-Code-as-trading-terminal workflow as a cloneable, repro
 - `doctor.sh` health check (MCP reachability, creds validity, vault shape).
 
 **Out of scope (v0.1):**
-- Custom REPL / CLI wrapper (that would be `clitrader`, deferred).
+- Custom REPL / CLI wrapper (that would be `traderkit-cli`, deferred).
 - Multi-LLM runtime (user brings their own MCP client — Claude Code default).
 - Web UI, mobile, push notifications.
 - Day-P&L circuit breaker (v0.2).
@@ -44,7 +44,7 @@ Ship the author's Claude-Code-as-trading-terminal workflow as a cloneable, repro
 ### 3.1 High-level
 
 ```
-mcp-trader-kit  (GitHub repo, clone + setup)
+traderkit  (GitHub repo, clone + setup)
 ├── Install script           — interactive creds, MCP wiring, hook registration
 ├── trade-guard-mcp          — gate MCP: caps, wash-sale, TLH
 ├── CLAUDE.md template       — auto-load, proposal convention, auto-persist
@@ -59,7 +59,7 @@ mcp-trader-kit  (GitHub repo, clone + setup)
 ```
 User's machine
 ├── Claude Code (or any MCP client)  — REPL, LLM, tool-use loop, session log
-├── ~/.mcp-trader-kit/
+├── ~/.traderkit/
 │   ├── .env                         — secrets (gitignored)
 │   ├── profiles/*.md                — user's profiles (copied from templates)
 │   └── vault/                       — Obsidian-style trading vault
@@ -85,7 +85,7 @@ Node 20+ MCP server, stdio transport, TS source, built w/ `@modelcontextprotocol
 **Tools:**
 
 - `check_trade(profile: string, tool: string, args: object) → { pass: boolean, reasons: string[], warnings: string[] }`
-  - Reads profile YAML at `~/.mcp-trader-kit/profiles/<profile>.md`.
+  - Reads profile YAML at `~/.traderkit/profiles/<profile>.md`.
   - Runs caps check (`max_order_notional`, `max_single_name_pct`, `forbidden_tools`, `forbidden_leg_shapes`).
   - Runs wash-sale check internally (calls `check_wash_sale`).
   - Composes single pass/fail w/ reasons.
@@ -134,7 +134,7 @@ Claude Code project-scoped settings register a `PreToolUse` hook w/ matcher targ
     "PreToolUse": [
       {
         "matcher": "mcp__snaptrade-trade__*|mcp__tradestation__place_order|mcp__tradestation__cancel_order",
-        "command": "node ~/.mcp-trader-kit/scripts/pre-tool-use.js",
+        "command": "node ~/.traderkit/scripts/pre-tool-use.js",
         "description": "Enforce risk gates before destructive trade tools"
       }
     ]
@@ -142,7 +142,7 @@ Claude Code project-scoped settings register a `PreToolUse` hook w/ matcher targ
 }
 ```
 
-The hook script reads tool name + args from stdin, reads the active profile (env var `MCP_TRADER_KIT_PROFILE` or session state file at `~/.mcp-trader-kit/.session.json`), calls `trade-guard.check_trade` via a short-lived stdio client, and:
+The hook script reads tool name + args from stdin, reads the active profile (env var `TRADERKIT_PROFILE` or session state file at `~/.traderkit/.session.json`), calls `trade-guard.check_trade` via a short-lived stdio client, and:
 
 - Pass → exit 0 w/ original input passed through.
 - Reject (caps/wash-sale) → exit 2 w/ structured block reason that Claude Code surfaces to the model.
@@ -150,7 +150,7 @@ The hook script reads tool name + args from stdin, reads the active profile (env
 
 Impact endpoints (`equity_impact`, `mleg_impact`) are not matched → bypass the hook. They hit the broker for preview only.
 
-**Profile switch:** documented slash-like convention in CLAUDE.md — user types "switch to bildof" → model writes `MCP_TRADER_KIT_PROFILE=bildof` to `~/.mcp-trader-kit/.session.json` via a `set_profile` tool exposed by trade-guard-mcp.
+**Profile switch:** documented slash-like convention in CLAUDE.md — user types "switch to bildof" → model writes `TRADERKIT_PROFILE=bildof` to `~/.traderkit/.session.json` via a `set_profile` tool exposed by trade-guard-mcp.
 
 ### 3.4 Staged-proposal UX — convention, not code
 
@@ -200,8 +200,8 @@ All docs use YAML frontmatter w/ `agent_writeable` flag. Auto-persist rule baked
 Interactive. Steps:
 
 1. Prompt for vault path (default: `./vault`). Create + copy template.
-2. Prompt for `~/.mcp-trader-kit/` location (default: `$HOME/.mcp-trader-kit`). Create + copy profiles templates.
-3. Prompt for provider creds (SnapTrade, TradeStation, EXA; optional UW, radon). Write to `~/.mcp-trader-kit/.env` (gitignored).
+2. Prompt for `~/.traderkit/` location (default: `$HOME/.traderkit`). Create + copy profiles templates.
+3. Prompt for provider creds (SnapTrade, TradeStation, EXA; optional UW, radon). Write to `~/.traderkit/.env` (gitignored).
 4. Walk user through first profile: name, broker, account_id (or "discover later"), tax_entity, caps.
 5. Run `npm install -g` (or `npx` alias) for trade-guard-mcp + the required MCPs.
 6. Write Claude Code project settings (`.claude/settings.json` in vault dir) w/ MCP registrations + PreToolUse hook.
@@ -236,7 +236,7 @@ hook                  OK        PreToolUse registered
 3. Model emits a **numbered proposal** per CLAUDE.md convention (not a tool call yet).
 4. User types "do it".
 5. Model emits `mcp__snaptrade-trade__mleg_place` tool_use.
-6. Claude Code PreToolUse hook fires → runs `node ~/.mcp-trader-kit/scripts/pre-tool-use.js`.
+6. Claude Code PreToolUse hook fires → runs `node ~/.traderkit/scripts/pre-tool-use.js`.
 7. Hook script connects stdio to trade-guard-mcp, calls `check_trade({profile: "bildof", tool: "mleg_place", args: {...}})`.
 8. trade-guard runs caps + wash-sale → returns `{ pass: false, reasons: ["notional $72,600 > cap $5,000"] }`.
 9. Hook exits 2 w/ reason → Claude Code surfaces block to the model.
@@ -277,7 +277,7 @@ hook                  OK        PreToolUse registered
 
 ## 7. Security / secrets
 
-- `~/.mcp-trader-kit/.env` — gitignored, 0600 perms.
+- `~/.traderkit/.env` — gitignored, 0600 perms.
 - Setup script validates creds before writing (calls SnapTrade status, EXA ping, etc).
 - Never log raw creds. Redaction middleware in trade-guard-mcp (pattern: any substring match against env values → `<REDACTED>`).
 - Installer refuses to write creds if vault path is inside a git repo with an unignored `.env`.
@@ -297,7 +297,7 @@ hook                  OK        PreToolUse registered
 - Mandatory `[[theses/*]]` link on destructive trades.
 - Brokerage-specific quirk docs (extended hours, RH read-only, etc).
 - UW-MCP wrapper shipped as a separate OSS dep.
-- `clitrader` — thin CLI that bundles this kit w/ Vercel AI SDK for non-Claude LLM use. Optional, earned by demand.
+- `traderkit-cli` — thin CLI that bundles this kit w/ Vercel AI SDK for non-Claude LLM use. Optional, earned by demand.
 
 ## 9. Dependencies
 
@@ -321,7 +321,7 @@ hook                  OK        PreToolUse registered
 ## 10. Repo layout
 
 ```
-mcp-trader-kit/
+traderkit/
 ├── README.md
 ├── SETUP.md
 ├── LICENSE
@@ -375,7 +375,7 @@ mcp-trader-kit/
 | 5 | Approval UX | Staged proposals via CLAUDE.md convention; hook enforces hard rules. |
 | 6 | Distribution | Cloneable GH repo + npm-published trade-guard-mcp. |
 | 7 | OSS model | Public MIT day 1 w/ disclaimer + fail-closed defaults. |
-| 8 | Multi-LLM | Deferred to v0.2 via optional `clitrader` wrapper; v0.1 works w/ any MCP-capable client but targets Claude Code. |
+| 8 | Multi-LLM | Deferred to v0.2 via optional `traderkit-cli` wrapper; v0.1 works w/ any MCP-capable client but targets Claude Code. |
 
 ## 12. Open items (deferred, not v0.1 blockers)
 
@@ -383,8 +383,8 @@ mcp-trader-kit/
 - radon MCP shim shape — radon exposes Python; wrapper TBD.
 - TradeStation MCP source — user already has running; doc the wiring.
 - "MCP client other than Claude Code" docs — minimal note in v0.1, expand on demand.
-- `clitrader` (v0.2 optional) — Vercel AI SDK thin CLI that bundles this kit for GPT/Gemini users.
+- `traderkit-cli` (v0.2 optional) — Vercel AI SDK thin CLI that bundles this kit for GPT/Gemini users.
 
 ## 13. Disclaimer (READ ME)
 
-mcp-trader-kit places real orders against real brokerage accounts via SnapTrade and other brokers. The authors disclaim all liability for losses, tax consequences, broker-side errors, model hallucinations, or any other outcome of its use. Not financial advice. You are responsible for every order approved in the REPL. Review every proposal block before approving. Test on paper/sandbox accounts first. Do not disable the PreToolUse hook. Do not remove the risk gates.
+traderkit places real orders against real brokerage accounts via SnapTrade and other brokers. The authors disclaim all liability for losses, tax consequences, broker-side errors, model hallucinations, or any other outcome of its use. Not financial advice. You are responsible for every order approved in the REPL. Review every proposal block before approving. Test on paper/sandbox accounts first. Do not disable the PreToolUse hook. Do not remove the risk gates.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -u
-KIT_ROOT="${MCP_TRADER_KIT_ROOT:-$HOME/.mcp-trader-kit}"
+KIT_ROOT="${TRADERKIT_ROOT:-$HOME/.traderkit}"
 FAIL=0
 
 row() { printf '%-22s %-6s %s\n' "$1" "$2" "$3"; }

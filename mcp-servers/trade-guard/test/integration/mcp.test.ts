@@ -24,7 +24,7 @@ describe("trade-guard-mcp stdio integration", () => {
     const filteredEnv: Record<string, string> = Object.fromEntries(
       Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][]
     );
-    const env = { ...filteredEnv, MCP_TRADER_KIT_ROOT: kitRoot };
+    const env = { ...filteredEnv, TRADERKIT_ROOT: kitRoot };
     // Ensure server boots without attempting to connect to snaptrade-read
     delete (env as Record<string, string>)["SNAPTRADE_READ_COMMAND"];
 

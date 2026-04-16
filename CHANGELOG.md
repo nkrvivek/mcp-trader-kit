@@ -8,7 +8,7 @@
 - Gates: caps (notional, single-name %, forbidden tools + leg shapes), wash-sale (±30d, tax_entity pool, options-on-underlying).
 - Credential redaction on tool responses.
 
-### mcp-trader-kit (repo)
+### traderkit (repo)
 - `setup.sh`, `doctor.sh`, `refresh.sh`, `pre-tool-use.js`.
 - Templates: CLAUDE.md, profiles, vault (Obsidian-style wiki/trading/...).
 - Docs: brokerages, UW, TradeStation, EXA, tax-entity, risk-gates, proposal-ux.

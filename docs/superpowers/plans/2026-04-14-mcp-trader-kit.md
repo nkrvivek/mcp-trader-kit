@@ -1,10 +1,10 @@
-# mcp-trader-kit Implementation Plan
+# traderkit Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship a cloneable OSS setup pack that gives other traders the author's Claude-Code-as-trading-terminal workflow (gated trade execution, Obsidian-style vault, wash-sale aware, multi-profile) via one `./setup.sh` run.
 
-**Architecture:** Node 20 / TypeScript monorepo. Two publishable artifacts: (1) `mcp-trader-kit` GH repo — setup scripts + templates + docs; (2) `trade-guard-mcp` npm package — MCP server enforcing risk gates via PreToolUse hook. trade-guard-mcp spawns a sibling snaptrade-mcp-ts client on demand for wash-sale activity lookups.
+**Architecture:** Node 20 / TypeScript monorepo. Two publishable artifacts: (1) `traderkit` GH repo — setup scripts + templates + docs; (2) `trade-guard-mcp` npm package — MCP server enforcing risk gates via PreToolUse hook. trade-guard-mcp spawns a sibling snaptrade-mcp-ts client on demand for wash-sale activity lookups.
 
 **Tech Stack:** Node 20, TypeScript 5, `@modelcontextprotocol/sdk`, `zod` v4, `yaml`, `vitest` + `@vitest/coverage-v8`, `msw` for MCP mocking, bash for setup/doctor scripts.
 
@@ -15,7 +15,7 @@
 ## File Structure
 
 ```
-mcp-trader-kit/
+traderkit/
 ├── package.json                            # workspace root
 ├── tsconfig.base.json
 ├── .gitignore
@@ -95,24 +95,24 @@ mcp-trader-kit/
 - `gates/` pure functions with no side effects except wash-sale (which makes one MCP-client call). Caps and compose are pure.
 - `mcp/snaptrade-read-client.ts` is the only place that spawns a sibling MCP. All other tool logic consumes its cached output.
 - Each tool file is a thin adapter: parse zod-validated args → call corresponding gate/scanner → format MCP response.
-- `session.ts` is the only thing that touches `~/.mcp-trader-kit/.session.json` — single writer, easy to test.
+- `session.ts` is the only thing that touches `~/.traderkit/.session.json` — single writer, easy to test.
 
 ---
 
 ## Task 1: Scaffold monorepo + CI
 
 **Files:**
-- Create: `mcp-trader-kit/package.json`
-- Create: `mcp-trader-kit/tsconfig.base.json`
-- Create: `mcp-trader-kit/.gitignore`
-- Create: `mcp-trader-kit/.github/workflows/ci.yml`
-- Create: `mcp-trader-kit/LICENSE`
+- Create: `traderkit/package.json`
+- Create: `traderkit/tsconfig.base.json`
+- Create: `traderkit/.gitignore`
+- Create: `traderkit/.github/workflows/ci.yml`
+- Create: `traderkit/LICENSE`
 
 - [ ] **Step 1: Create root `package.json` with npm workspaces**
 
 ```json
 {
-  "name": "mcp-trader-kit",
+  "name": "traderkit",
   "version": "0.0.0",
   "private": true,
   "description": "Packaged Claude-Code-as-trading-terminal setup with risk-gated MCP trading.",
@@ -156,7 +156,7 @@ coverage/
 .env.local
 *.log
 .DS_Store
-.mcp-trader-kit/
+.traderkit/
 ```
 
 - [ ] **Step 4: Create `LICENSE` (MIT)**
@@ -498,7 +498,7 @@ Expected: FAIL.
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-export const KIT_ROOT = process.env.MCP_TRADER_KIT_ROOT ?? join(homedir(), ".mcp-trader-kit");
+export const KIT_ROOT = process.env.TRADERKIT_ROOT ?? join(homedir(), ".traderkit");
 export const PROFILES_DIR = join(KIT_ROOT, "profiles");
 export const SESSION_FILE = ".session.json";
 export const ACTIVITIES_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -1711,7 +1711,7 @@ describe("trade-guard-mcp stdio integration", () => {
     const transport = new StdioClientTransport({
       command: "node",
       args: [join(process.cwd(), "dist/index.js")],
-      env: { ...process.env, MCP_TRADER_KIT_ROOT: kitRoot },
+      env: { ...process.env, TRADERKIT_ROOT: kitRoot },
     });
     client = new Client({ name: "test", version: "0.0.0" }, { capabilities: {} });
     await client.connect(transport);
@@ -1789,9 +1789,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const KIT_ROOT = process.env.MCP_TRADER_KIT_ROOT || join(homedir(), ".mcp-trader-kit");
+const KIT_ROOT = process.env.TRADERKIT_ROOT || join(homedir(), ".traderkit");
 const SESSION_FILE = join(KIT_ROOT, ".session.json");
-const FAIL_CLOSED = process.env.MCP_TRADER_KIT_FAIL_OPEN !== "true";
+const FAIL_CLOSED = process.env.TRADERKIT_FAIL_OPEN !== "true";
 
 async function readStdin() {
   let data = "";
@@ -1899,7 +1899,7 @@ git commit -m "feat(hook): PreToolUse gate script invokes trade-guard-mcp via st
 - [ ] **Step 1: Write CLAUDE.md template**
 
 ```md
-# mcp-trader-kit — session rules
+# traderkit — session rules
 
 Auto-loads at every Claude Code session start inside this vault.
 
@@ -1928,7 +1928,7 @@ Wait for natural-language approval ("do #1", "skip", "change qty", "what's max l
 The PreToolUse hook enforces hard rules regardless — proposals are for visibility.
 
 ## 3. Active profile
-The active profile lives in `~/.mcp-trader-kit/.session.json`. To switch mid-session, call `trade-guard.set_profile(name)`. Every destructive call re-reads the active profile — no caching.
+The active profile lives in `~/.traderkit/.session.json`. To switch mid-session, call `trade-guard.set_profile(name)`. Every destructive call re-reads the active profile — no caching.
 
 On session start, ask "which profile?" if none is set. Never emit a destructive tool without an active profile.
 
@@ -2160,7 +2160,7 @@ touch templates/vault/wiki/trading/sessions/.gitkeep
     "PreToolUse": [
       {
         "matcher": "mcp__snaptrade-trade__equity_force_place|mcp__snaptrade-trade__equity_confirm|mcp__snaptrade-trade__mleg_place|mcp__snaptrade-trade__cancel_order",
-        "command": "node ${HOME}/.mcp-trader-kit/scripts/pre-tool-use.js",
+        "command": "node ${HOME}/.traderkit/scripts/pre-tool-use.js",
         "description": "Enforce trade-guard risk gates"
       }
     ]
@@ -2189,13 +2189,13 @@ git commit -m "feat(templates): profile + vault + claude-settings templates"
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-KIT_ROOT="${MCP_TRADER_KIT_ROOT:-$HOME/.mcp-trader-kit}"
+KIT_ROOT="${TRADERKIT_ROOT:-$HOME/.traderkit}"
 VAULT_DEFAULT="$PWD/vault"
 
 say() { printf '\n\033[1;36m› %s\033[0m\n' "$*"; }
 ask() { local prompt="$1" default="${2:-}" reply; read -r -p "$prompt [${default}]: " reply; printf '%s' "${reply:-$default}"; }
 
-say "mcp-trader-kit setup"
+say "traderkit setup"
 echo "Repo: $REPO_ROOT"
 echo "Kit state dir: $KIT_ROOT"
 
@@ -2231,7 +2231,7 @@ done
 say "Writing .env template (if missing)"
 if [[ ! -f "$KIT_ROOT/.env" ]]; then
   cat > "$KIT_ROOT/.env" <<'EOF'
-# mcp-trader-kit secrets — edit these
+# traderkit secrets — edit these
 ANTHROPIC_API_KEY=
 SNAPTRADE_CLIENT_ID=
 SNAPTRADE_CONSUMER_KEY=
@@ -2265,7 +2265,7 @@ Run: `chmod +x /Users/Vivek/Development/mcp-trader-kit/scripts/setup.sh`
 Run:
 ```bash
 cd /tmp && rm -rf mtk-dryrun && mkdir mtk-dryrun && cd mtk-dryrun
-MCP_TRADER_KIT_ROOT=/tmp/mtk-dryrun/kit bash /Users/Vivek/Development/mcp-trader-kit/scripts/setup.sh <<< $'\n'
+TRADERKIT_ROOT=/tmp/mtk-dryrun/kit bash /Users/Vivek/Development/mcp-trader-kit/scripts/setup.sh <<< $'\n'
 ls -la /tmp/mtk-dryrun/vault/.claude /tmp/mtk-dryrun/kit/profiles
 ```
 Expected: `vault/.claude/settings.json` exists; `kit/profiles/example-personal.md` + `example-llc.md` exist; `kit/.env` present w/ 600 perms.
@@ -2289,7 +2289,7 @@ git commit -m "feat(scripts): interactive setup.sh installer"
 ```bash
 #!/usr/bin/env bash
 set -u
-KIT_ROOT="${MCP_TRADER_KIT_ROOT:-$HOME/.mcp-trader-kit}"
+KIT_ROOT="${TRADERKIT_ROOT:-$HOME/.traderkit}"
 FAIL=0
 
 row() { printf '%-22s %-6s %s\n' "$1" "$2" "$3"; }
@@ -2344,7 +2344,7 @@ Run: `chmod +x /Users/Vivek/Development/mcp-trader-kit/scripts/doctor.sh`
 
 - [ ] **Step 3: Dry-run against the tmp vault from Task 16**
 
-Run: `MCP_TRADER_KIT_ROOT=/tmp/mtk-dryrun/kit bash /Users/Vivek/Development/mcp-trader-kit/scripts/doctor.sh`
+Run: `TRADERKIT_ROOT=/tmp/mtk-dryrun/kit bash /Users/Vivek/Development/mcp-trader-kit/scripts/doctor.sh`
 Expected: kit-root OK, env-file OK, profiles OK (2 profile(s)), hook-script OK, snaptrade-creds FAIL (placeholder env), exit 1.
 
 - [ ] **Step 4: Commit**
@@ -2412,7 +2412,7 @@ git commit -m "feat(scripts): refresh.sh emits standard refresh prompt"
 ```md
 # Supported Brokerages (via SnapTrade)
 
-mcp-trader-kit inherits brokerage support from SnapTrade. Tested:
+traderkit inherits brokerage support from SnapTrade. Tested:
 
 | Broker | Read | Write | Notes |
 |---|---|---|---|
@@ -2436,7 +2436,7 @@ mcp-trader-kit inherits brokerage support from SnapTrade. Tested:
 ```md
 # Unusual Whales (optional)
 
-mcp-trader-kit does not ship a UW MCP in v0.1. If you have a UW token and want UW endpoints in Claude Code, wire a UW MCP server separately.
+traderkit does not ship a UW MCP in v0.1. If you have a UW token and want UW endpoints in Claude Code, wire a UW MCP server separately.
 
 ## Token tier
 Probe your token against ~39 endpoints to see which tier you're on. Full-tier reaches: `darkpool/recent`, `darkpool/{ticker}`, `option-trades/flow-alerts`, `stock/{t}/flow-alerts`, `stock/{t}/greek-exposure`, `stock/{t}/spot-exposures`, `congress/recent-trades`, `insider/transactions`, `market/fda-calendar`, `screener/{analysts,stocks,option-contracts}`, `news/headlines`, `earnings/{premarket,afterhours,{t}}`, `etfs/{t}/holdings`, `alerts/configuration`.
@@ -2466,7 +2466,7 @@ Register under `mcpServers.tradestation` in `.claude/settings.json`. The trade-g
 ```md
 # EXA
 
-Research MCP. Required. Set `EXA_API_KEY` in `~/.mcp-trader-kit/.env`.
+Research MCP. Required. Set `EXA_API_KEY` in `~/.traderkit/.env`.
 
 Typical tools: `web_search_exa`, `crawling_exa`, `deep_researcher_start`, `deep_researcher_check`.
 
@@ -2505,7 +2505,7 @@ Enforcement lives in three layers:
 3. **trade-guard-mcp** — caps (notional, single-name %, forbidden tools/legs) + wash-sale (±30d, tax_entity pool).
 
 ## Fail-closed default
-If the hook cannot reach trade-guard-mcp or the active profile is unset, the hook blocks by default. Override with `MCP_TRADER_KIT_FAIL_OPEN=true` (not recommended).
+If the hook cannot reach trade-guard-mcp or the active profile is unset, the hook blocks by default. Override with `TRADERKIT_FAIL_OPEN=true` (not recommended).
 
 ## Forbidden leg shapes
 Defined in profile YAML. trade-guard inspects args passed to `mleg_place` and rejects if any leg matches a forbidden shape.
@@ -2651,8 +2651,7 @@ git commit -m "docs(examples): Bildof CC ladder + TLH walkthrough + regime check
 - [ ] **Step 1: Write `README.md`**
 
 ```md
-# mcp-trader-kit
-
+# traderkit
 Packaged Claude-Code-as-trading-terminal setup. Clone, run `./scripts/setup.sh`, get:
 
 - **Risk-gated trade execution** — caps, forbidden tools/legs, wash-sale pre-trade check.
@@ -2668,12 +2667,12 @@ This software places real orders against real brokerage accounts. The authors di
 ## Quickstart
 
 ```bash
-git clone https://github.com/nkrvivek/mcp-trader-kit
-cd mcp-trader-kit
+git clone https://github.com/nkrvivek/traderkit
+cd traderkit
 npm install
 ./scripts/setup.sh
-# edit ~/.mcp-trader-kit/.env with credentials
-# edit ~/.mcp-trader-kit/profiles/*.md with your account_ids
+# edit ~/.traderkit/.env with credentials
+# edit ~/.traderkit/profiles/*.md with your account_ids
 ./scripts/doctor.sh
 cd vault && claude
 ```
@@ -2709,8 +2708,8 @@ MIT. See [LICENSE](LICENSE).
 ## Step 1: Clone + install
 
 ```bash
-git clone https://github.com/nkrvivek/mcp-trader-kit
-cd mcp-trader-kit
+git clone https://github.com/nkrvivek/traderkit
+cd traderkit
 npm install
 npm run build
 ```
@@ -2724,14 +2723,14 @@ npm run build
 The script:
 1. Prompts for a vault path (default `./vault`).
 2. Copies vault + CLAUDE.md templates.
-3. Copies profile templates → `~/.mcp-trader-kit/profiles/`.
-4. Copies the hook script → `~/.mcp-trader-kit/scripts/`.
-5. Writes `~/.mcp-trader-kit/.env` template (600 perms).
+3. Copies profile templates → `~/.traderkit/profiles/`.
+4. Copies the hook script → `~/.traderkit/scripts/`.
+5. Writes `~/.traderkit/.env` template (600 perms).
 6. Writes `<vault>/.claude/settings.json` (MCP registrations + PreToolUse hook matcher).
 
 ## Step 3: Credentials
 
-Edit `~/.mcp-trader-kit/.env`:
+Edit `~/.traderkit/.env`:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
@@ -2745,7 +2744,7 @@ UW_TOKEN=...        # optional
 
 ## Step 4: Profiles
 
-Edit `~/.mcp-trader-kit/profiles/example-personal.md` (rename to e.g. `personal.md`). Replace `account_id` with the UUID from a `snaptrade_list_accounts` call. Set realistic caps.
+Edit `~/.traderkit/profiles/example-personal.md` (rename to e.g. `personal.md`). Replace `account_id` with the UUID from a `snaptrade_list_accounts` call. Set realistic caps.
 
 Repeat for each account. Pool wash-sale scope via `tax_entity`: all personal accounts get `personal`; each LLC gets its own `llc-*`.
 
@@ -2774,7 +2773,7 @@ Try: "list positions in `<profile>`", then a small proposal. Verify the hook fir
 
 - **Hook never fires:** check `.claude/settings.json` matcher pattern — tool names must start with `mcp__<server-name>__<tool-name>`.
 - **Wash-sale check always returns unavailable:** confirm `SNAPTRADE_READ_COMMAND=npx SNAPTRADE_READ_ARGS="-y snaptrade-mcp-ts"` is in the env when trade-guard-mcp launches (Claude Code inherits the project env).
-- **Profile not found:** `trade-guard.list_profiles` should show the file name (without `.md`) — if empty, verify YAML frontmatter parses and `MCP_TRADER_KIT_ROOT` points where you think.
+- **Profile not found:** `trade-guard.list_profiles` should show the file name (without `.md`) — if empty, verify YAML frontmatter parses and `TRADERKIT_ROOT` points where you think.
 ```
 
 - [ ] **Step 3: Commit**
@@ -2797,10 +2796,10 @@ git commit -m "docs: README + SETUP + quickstart walkthrough"
 ```ts
 // scripts/live-trade-smoke.ts
 // Places $1 order + immediate cancel against a live account.
-// Gated by CLITRADER_ALLOW_LIVE=true. DO NOT remove the guard.
+// Gated by TRADERKIT_ALLOW_LIVE=true. DO NOT remove the guard.
 
-if (process.env.CLITRADER_ALLOW_LIVE !== "true") {
-  console.error("REFUSING TO RUN: set CLITRADER_ALLOW_LIVE=true to proceed (live order will be placed and canceled).");
+if (process.env.TRADERKIT_ALLOW_LIVE !== "true") {
+  console.error("REFUSING TO RUN: set TRADERKIT_ALLOW_LIVE=true to proceed (live order will be placed and canceled).");
   process.exit(1);
 }
 
@@ -2836,9 +2835,9 @@ And add `tsx` to devDependencies via `npm i -D tsx -w .`
 - [ ] **Step 3: Verify guard trips**
 
 Run: `npm run smoke`
-Expected: "REFUSING TO RUN: set CLITRADER_ALLOW_LIVE=true..." exit 1.
+Expected: "REFUSING TO RUN: set TRADERKIT_ALLOW_LIVE=true..." exit 1.
 
-Run: `CLITRADER_ALLOW_LIVE=true SMOKE_ACCOUNT_ID=x SMOKE_PROFILE=y npm run smoke`
+Run: `TRADERKIT_ALLOW_LIVE=true SMOKE_ACCOUNT_ID=x SMOKE_PROFILE=y npm run smoke`
 Expected: prints walkthrough, exit 0.
 
 - [ ] **Step 4: Commit**
@@ -2904,9 +2903,9 @@ jobs:
   "name": "trade-guard-mcp",
   ...
   "publishConfig": { "access": "public" },
-  "repository": { "type": "git", "url": "git+https://github.com/nkrvivek/mcp-trader-kit.git", "directory": "mcp-servers/trade-guard" },
+  "repository": { "type": "git", "url": "git+https://github.com/nkrvivek/traderkit.git", "directory": "mcp-servers/trade-guard" },
   "keywords": ["mcp", "trading", "snaptrade", "claude", "risk-gate", "wash-sale"],
-  "homepage": "https://github.com/nkrvivek/mcp-trader-kit"
+  "homepage": "https://github.com/nkrvivek/traderkit"
 }
 ```
 
@@ -2951,7 +2950,7 @@ Manual steps (document outcomes in a temp file, not committed):
 - Gates: caps (notional, single-name %, forbidden tools + leg shapes), wash-sale (±30d, tax_entity pool, options-on-underlying).
 - Credential redaction on tool responses.
 
-### mcp-trader-kit (repo)
+### traderkit (repo)
 - `setup.sh`, `doctor.sh`, `refresh.sh`, `pre-tool-use.js`.
 - Templates: CLAUDE.md, profiles, vault (Obsidian-style wiki/trading/...).
 - Docs: brokerages, UW, TradeStation, EXA, tax-entity, risk-gates, proposal-ux.
@@ -2972,7 +2971,7 @@ git tag trade-guard-v0.1.0
 
 ```bash
 # Confirm scope with user before running:
-gh repo create nkrvivek/mcp-trader-kit --public --source=. --description "Packaged Claude-Code-as-trading-terminal setup with risk gates"
+gh repo create nkrvivek/traderkit --public --source=. --description "Packaged Claude-Code-as-trading-terminal setup with risk gates"
 git push -u origin main
 git push --tags
 ```
@@ -2987,6 +2986,6 @@ git push --tags
 - Mandatory `[[theses/*]]` link on destructive trades.
 - UW MCP wrapper (separate repo).
 - radon MCP shim.
-- `clitrader` thin CLI wrapper w/ Vercel AI SDK for GPT/Gemini users.
+- `traderkit-cli` thin CLI wrapper w/ Vercel AI SDK for GPT/Gemini users.
 - Binary builds via `bun compile`.
 - Automated brokerage MCP installers in `setup.sh`.

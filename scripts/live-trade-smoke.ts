@@ -1,9 +1,9 @@
 // scripts/live-trade-smoke.ts
 // Places $1 order + immediate cancel against a live account.
-// Gated by CLITRADER_ALLOW_LIVE=true. DO NOT remove the guard.
+// Gated by TRADERKIT_ALLOW_LIVE=true. DO NOT remove the guard.
 
-if (process.env.CLITRADER_ALLOW_LIVE !== "true") {
-  console.error("REFUSING TO RUN: set CLITRADER_ALLOW_LIVE=true to proceed (live order will be placed and canceled).");
+if (process.env.TRADERKIT_ALLOW_LIVE !== "true") {
+  console.error("REFUSING TO RUN: set TRADERKIT_ALLOW_LIVE=true to proceed (live order will be placed and canceled).");
   process.exit(1);
 }
 

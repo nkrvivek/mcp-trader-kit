@@ -8,9 +8,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const KIT_ROOT = process.env.MCP_TRADER_KIT_ROOT || join(homedir(), ".mcp-trader-kit");
+const KIT_ROOT = process.env.TRADERKIT_ROOT || join(homedir(), ".traderkit");
 const SESSION_FILE = join(KIT_ROOT, ".session.json");
-const FAIL_CLOSED = process.env.MCP_TRADER_KIT_FAIL_OPEN !== "true";
+const FAIL_CLOSED = process.env.TRADERKIT_FAIL_OPEN !== "true";
 
 async function readStdin() {
   let data = "";

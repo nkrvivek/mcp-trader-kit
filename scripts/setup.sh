@@ -2,13 +2,13 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-KIT_ROOT="${MCP_TRADER_KIT_ROOT:-$HOME/.mcp-trader-kit}"
+KIT_ROOT="${TRADERKIT_ROOT:-$HOME/.traderkit}"
 VAULT_DEFAULT="$PWD/vault"
 
 say() { printf '\n\033[1;36m› %s\033[0m\n' "$*"; }
 ask() { local prompt="$1" default="${2:-}" reply; read -r -p "$prompt [${default}]: " reply; printf '%s' "${reply:-$default}"; }
 
-say "mcp-trader-kit setup"
+say "traderkit setup"
 echo "Repo: $REPO_ROOT"
 echo "Kit state dir: $KIT_ROOT"
 
@@ -44,7 +44,7 @@ done
 say "Writing .env template (if missing)"
 if [[ ! -f "$KIT_ROOT/.env" ]]; then
   cat > "$KIT_ROOT/.env" <<'EOF'
-# mcp-trader-kit secrets — edit these
+# traderkit secrets — edit these
 ANTHROPIC_API_KEY=
 SNAPTRADE_CLIENT_ID=
 SNAPTRADE_CONSUMER_KEY=

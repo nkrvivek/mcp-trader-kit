@@ -1,6 +1,6 @@
 # Supported Brokerages (via SnapTrade)
 
-mcp-trader-kit inherits brokerage support from SnapTrade. Tested:
+traderkit inherits brokerage support from SnapTrade. Tested:
 
 | Broker | Read | Write | Notes |
 |---|---|---|---|

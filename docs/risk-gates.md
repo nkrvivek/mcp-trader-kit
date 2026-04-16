@@ -7,7 +7,7 @@ Enforcement lives in three layers:
 3. **trade-guard-mcp** — caps (notional, single-name %, forbidden tools/legs) + wash-sale (±30d, tax_entity pool).
 
 ## Fail-closed default
-If the hook cannot reach trade-guard-mcp or the active profile is unset, the hook blocks by default. Override with `MCP_TRADER_KIT_FAIL_OPEN=true` (not recommended).
+If the hook cannot reach trade-guard-mcp or the active profile is unset, the hook blocks by default. Override with `TRADERKIT_FAIL_OPEN=true` (not recommended).
 
 ## Forbidden leg shapes
 Defined in profile YAML. trade-guard inspects args passed to `mleg_place` and rejects if any leg matches a forbidden shape.

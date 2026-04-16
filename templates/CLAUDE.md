@@ -1,4 +1,4 @@
-# mcp-trader-kit — session rules
+# traderkit — session rules
 
 Auto-loads at every Claude Code session start inside this vault.
 
@@ -27,7 +27,7 @@ Wait for natural-language approval ("do #1", "skip", "change qty", "what's max l
 The PreToolUse hook enforces hard rules regardless — proposals are for visibility.
 
 ## 3. Active profile
-The active profile lives in `~/.mcp-trader-kit/.session.json`. To switch mid-session, call `trade-guard.set_profile(name)`. Every destructive call re-reads the active profile — no caching.
+The active profile lives in `~/.traderkit/.session.json`. To switch mid-session, call `trade-guard.set_profile(name)`. Every destructive call re-reads the active profile — no caching.
 
 On session start, ask "which profile?" if none is set. Never emit a destructive tool without an active profile.
 
