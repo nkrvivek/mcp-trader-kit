@@ -9,6 +9,9 @@ import { CheckTradeArgs, checkTradeHandler } from "./tools/check-trade.js";
 import { CheckWashSaleArgs, checkWashSaleHandler } from "./tools/check-wash-sale.js";
 import { listProfilesHandler } from "./tools/list-profiles.js";
 import { SetProfileArgs, setProfileHandler } from "./tools/set-profile.js";
+import { ScanTlhArgs, scanTlhHandler } from "./tools/scan-tlh-handler.js";
+import { CheckConcentrationArgs, checkConcentrationHandler } from "./tools/check-concentration.js";
+import { RegimeGateArgs, regimeGateHandler } from "./tools/regime-gate.js";
 import { redact } from "./redact.js";
 
 const TOOLS = [
@@ -23,6 +26,15 @@ const TOOLS = [
   { name: "set_profile", description: "Set the active profile in session state.",
     inputSchema: { type: "object", additionalProperties: false,
       properties: SetProfileArgs.shape as any, required: ["name"] } },
+  { name: "scan_tlh", description: "Scan positions for tax-loss harvesting candidates (wash-sale-clean).",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: ScanTlhArgs.shape as any, required: ["tax_entity", "positions"] } },
+  { name: "check_concentration", description: "Analyze portfolio concentration vs profile caps. Returns per-position labels (HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP) and HHI.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: CheckConcentrationArgs.shape as any, required: ["profile", "positions", "portfolio_total_usd"] } },
+  { name: "regime_gate", description: "Check if a trade is allowed under the current market regime. Returns adjusted sizing, blocked actions, and preferred structures.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: RegimeGateArgs.shape as any, required: ["regime_tier", "direction", "notional_usd"] } },
 ];
 
 const SECRETS = [
@@ -56,6 +68,9 @@ async function main() {
         case "check_wash_sale": result = await checkWashSaleHandler(req.params.arguments, deps); break;
         case "list_profiles":   result = await listProfilesHandler(req.params.arguments, deps); break;
         case "set_profile":     result = await setProfileHandler(req.params.arguments, deps); break;
+        case "scan_tlh":        result = await scanTlhHandler(req.params.arguments, deps); break;
+        case "check_concentration": result = await checkConcentrationHandler(req.params.arguments, deps); break;
+        case "regime_gate":     result = await regimeGateHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);

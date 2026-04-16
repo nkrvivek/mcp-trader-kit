@@ -18,12 +18,15 @@ npm install -g traderkit
 
 ## What it does
 
-Four MCP tools that sit between your AI assistant and your broker:
+Seven MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
 | `check_trade` | Gate a proposed trade against caps + wash-sale rules |
 | `check_wash_sale` | Standalone ±30-day wash-sale window check |
+| `scan_tlh` | Find tax-loss harvesting candidates (wash-sale-clean) |
+| `check_concentration` | Portfolio concentration analysis with HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP labels |
+| `regime_gate` | Market regime sizing gate — adjusts notional, blocks actions by tier |
 | `list_profiles` | List configured trading profiles |
 | `set_profile` | Set the active profile for the session |
 
@@ -44,6 +47,36 @@ Returns `{ pass: boolean, reasons: string[], warnings: string[] }`.
 Standalone wash-sale check. Pulls last 30 days of activity from a sibling [snaptrade-mcp-ts](https://www.npmjs.com/package/snaptrade-mcp-ts) server. Pools all accounts under the same `tax_entity` (e.g., all personal accounts share one wash-sale window; an LLC has its own).
 
 Graceful degradation: if snaptrade-read is unavailable, returns `flagged: false` with a warning rather than blocking.
+
+### `scan_tlh`
+
+Scans your positions for tax-loss harvesting opportunities. Filters to positions with unrealized loss above a threshold (default $500), then excludes any that would trigger a wash sale. Returns candidates sorted by loss size (largest first).
+
+Requires positions data as input (from `snaptrade_get_positions` or equivalent).
+
+### `check_concentration`
+
+Analyzes portfolio concentration against profile caps. Returns every position labeled:
+
+- **HEADROOM** — well below cap
+- **AT-CAP** — 75-90% of cap
+- **NEAR-CAP** — 90-100% of cap
+- **OVER-CAP** — exceeds cap
+
+Also returns the [HHI](https://en.wikipedia.org/wiki/Herfindahl%E2%80%93Hirschman_index) (Herfindahl-Hirschman Index) as a single-number diversification score, and the top 5 positions.
+
+### `regime_gate`
+
+Checks if a trade should proceed under the current market regime:
+
+| Tier | Size multiplier | Max DTE | Blocked actions |
+|------|----------------|---------|-----------------|
+| CLEAR | 1.0x | unlimited | none |
+| CAUTION | 0.75x | 45 DTE | none |
+| DEFENSIVE | 0.5x | 30 DTE | BUY, BUY_TO_OPEN |
+| HALT | 0.25x | 14 DTE | BUY, BUY_TO_OPEN, SELL_TO_OPEN |
+
+Returns adjusted notional, preferred structures for the tier, and whether the proposed structure aligns.
 
 ## Setup
 
