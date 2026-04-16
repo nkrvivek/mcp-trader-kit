@@ -12,6 +12,9 @@ import { SetProfileArgs, setProfileHandler } from "./tools/set-profile.js";
 import { ScanTlhArgs, scanTlhHandler } from "./tools/scan-tlh-handler.js";
 import { CheckConcentrationArgs, checkConcentrationHandler } from "./tools/check-concentration.js";
 import { RegimeGateArgs, regimeGateHandler } from "./tools/regime-gate.js";
+import { ProposeTradeArgs, proposeTradeHandler } from "./tools/propose-trade.js";
+import { TrackTaxArgs, trackTaxHandler } from "./tools/track-tax.js";
+import { TriggerCheckArgs, triggerCheckHandler } from "./tools/trigger-check.js";
 import { redact } from "./redact.js";
 
 const TOOLS = [
@@ -35,6 +38,15 @@ const TOOLS = [
   { name: "regime_gate", description: "Check if a trade is allowed under the current market regime. Returns adjusted sizing, blocked actions, and preferred structures.",
     inputSchema: { type: "object", additionalProperties: false,
       properties: RegimeGateArgs.shape as any, required: ["regime_tier", "direction", "notional_usd"] } },
+  { name: "propose_trade", description: "Assemble a sized trade proposal with concentration headroom, regime adjustment, and cap check.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: ProposeTradeArgs.shape as any, required: ["profile", "ticker", "direction", "current_price", "portfolio_total_usd"] } },
+  { name: "track_tax", description: "Compute running STCG/LTCG tax exposure from realized trades. Returns per-trade breakdown and reserve amounts.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: TrackTaxArgs.shape as any, required: ["trades"] } },
+  { name: "trigger_check", description: "Check for triggered events: NAV moves, regime shifts, concentration breaches. Returns severity-sorted event list.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: TriggerCheckArgs.shape as any, required: ["current_nav", "previous_nav", "current_regime_tier"] } },
 ];
 
 const SECRETS = [
@@ -71,6 +83,9 @@ async function main() {
         case "scan_tlh":        result = await scanTlhHandler(req.params.arguments, deps); break;
         case "check_concentration": result = await checkConcentrationHandler(req.params.arguments, deps); break;
         case "regime_gate":     result = await regimeGateHandler(req.params.arguments); break;
+        case "propose_trade":  result = await proposeTradeHandler(req.params.arguments, deps); break;
+        case "track_tax":      result = await trackTaxHandler(req.params.arguments); break;
+        case "trigger_check":  result = await triggerCheckHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);

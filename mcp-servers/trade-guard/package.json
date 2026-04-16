@@ -1,6 +1,6 @@
 {
   "name": "traderkit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Risk gate MCP for trading — caps, wash-sale, TLH.",
   "license": "MIT",
   "type": "module",

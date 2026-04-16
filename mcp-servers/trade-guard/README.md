@@ -18,15 +18,18 @@ npm install -g traderkit
 
 ## What it does
 
-Seven MCP tools that sit between your AI assistant and your broker:
+Ten MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
 | `check_trade` | Gate a proposed trade against caps + wash-sale rules |
 | `check_wash_sale` | Standalone ±30-day wash-sale window check |
 | `scan_tlh` | Find tax-loss harvesting candidates (wash-sale-clean) |
-| `check_concentration` | Portfolio concentration analysis with HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP labels |
+| `check_concentration` | Portfolio concentration analysis with HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP labels + HHI |
 | `regime_gate` | Market regime sizing gate — adjusts notional, blocks actions by tier |
+| `propose_trade` | Assemble a sized trade proposal with concentration headroom and regime adjustment |
+| `track_tax` | Running STCG/LTCG tax exposure from realized trades with per-trade breakdown |
+| `trigger_check` | Detect events: NAV moves, regime shifts, concentration breaches |
 | `list_profiles` | List configured trading profiles |
 | `set_profile` | Set the active profile for the session |
 
@@ -77,6 +80,38 @@ Checks if a trade should proceed under the current market regime:
 | HALT | 0.25x | 14 DTE | BUY, BUY_TO_OPEN, SELL_TO_OPEN |
 
 Returns adjusted notional, preferred structures for the tier, and whether the proposed structure aligns.
+
+### `propose_trade`
+
+End-to-end trade proposal builder. Takes a ticker, price, portfolio context, and regime tier. Produces a fully sized proposal with:
+
+- **Headroom-based sizing** — `(cap% - current%) × 0.5 × NAV × regime_multiplier`
+- **Cap enforcement** — capped at profile's `max_order_notional`
+- **Regime blocking** — rejects BUY in DEFENSIVE/HALT
+- **Concentration check** — rejects adds when already OVER-CAP
+- **Sizing trace** — human-readable formula for audit
+
+Optional: attach `thesis_ref` and `signal_summary` for proposal context.
+
+### `track_tax`
+
+Computes running tax exposure from an array of realized trades:
+
+- Separates STCG (<365 days) from LTCG (≥365 days)
+- Computes reserves at configurable rates (defaults: STCG 35.8%, LTCG 18.8%)
+- Tracks gains and losses separately per bucket
+- Flags wash-sale-adjusted trades
+- Returns per-trade breakdown sorted by date
+
+### `trigger_check`
+
+Event detector for portfolio monitoring. Checks three conditions:
+
+- **NAV_MOVE** — triggers on ±2% NAV change (configurable). CRITICAL at ±4%.
+- **REGIME_SHIFT** — fires when regime tier changes. CRITICAL on deterioration, INFO on improvement.
+- **CONCENTRATION_BREACH** — flags positions exceeding the cap. CRITICAL when 10pp+ over.
+
+Returns events sorted by severity (CRITICAL → WARNING → INFO).
 
 ## Setup
 

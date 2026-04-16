@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0] — 2026-04-16
+
+### traderkit
+- New tools: `propose_trade`, `track_tax`, `trigger_check`.
+- `propose_trade`: headroom-based sizing with regime multiplier, cap enforcement, concentration blocking.
+- `track_tax`: STCG/LTCG separation, configurable rates, wash-sale tracking, per-trade breakdown.
+- `trigger_check`: NAV move, regime shift, and concentration breach detection with severity levels.
+
+## [0.2.0] — 2026-04-16
+
+### traderkit
+- New tools: `scan_tlh`, `check_concentration`, `regime_gate`.
+- `scan_tlh`: wired existing TLH scanner into MCP tool list.
+- `check_concentration`: portfolio concentration labels (HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP) + HHI.
+- `regime_gate`: 4-tier market regime sizing (CLEAR/CAUTION/DEFENSIVE/HALT) with action blocking.
+
 ## [0.1.0] — 2026-04-14
 
 ### traderkit
