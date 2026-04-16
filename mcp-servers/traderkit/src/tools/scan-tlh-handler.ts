@@ -2,12 +2,15 @@ import { z } from "zod";
 import { scanTlh, type Position } from "./scan-tlh.js";
 import type { Profile } from "../profiles/schema.js";
 import type { SnaptradeReadClient } from "../mcp/snaptrade-read-client.js";
+import { TickerSchema } from "../utils/schemas.js";
+import { THIRTY_DAYS_MS } from "../utils/date.js";
+import { toMessage } from "../utils/errors.js";
 
 export const ScanTlhArgs = z.object({
   tax_entity: z.string().min(1),
   threshold_usd: z.number().nonnegative().default(500),
   positions: z.array(z.object({
-    ticker: z.string().min(1),
+    ticker: TickerSchema,
     qty: z.number().positive(),
     cost_basis_per_unit: z.number().nonnegative(),
     current_price: z.number().nonnegative(),
@@ -25,7 +28,6 @@ export async function scanTlhHandler(
     return { candidates: [], detail: `no profiles in tax_entity ${args.tax_entity}` };
   }
 
-  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
   const now = new Date();
   const since = new Date(now.getTime() - THIRTY_DAYS_MS);
 
@@ -34,7 +36,8 @@ export async function scanTlhHandler(
   if (deps.snaptradeRead) {
     try {
       activities = await deps.snaptradeRead.getActivities(pool.map((p) => p.account_id), since);
-    } catch {
+    } catch (e) {
+      process.stderr.write(`traderkit: scan_tlh activities fetch failed: ${toMessage(e)}\n`);
       activityWarning = "snaptrade-read unavailable — wash-sale filter skipped, candidates may not be clean";
     }
   } else {

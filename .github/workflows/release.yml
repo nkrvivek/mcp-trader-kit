@@ -12,6 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
       - run: npm ci
+      - run: npm run -w mcp-servers/traderkit typecheck
+      - run: npm run -w mcp-servers/traderkit test
       - run: npm run -w mcp-servers/traderkit build
       - run: npm publish -w mcp-servers/traderkit --access public
         env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }

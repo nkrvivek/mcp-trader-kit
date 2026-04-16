@@ -27,7 +27,10 @@ export function checkCaps(profile: Profile, trade: TradeProposal): GateResult {
   if (profile.caps.forbidden_tools.includes(trade.tool)) {
     reasons.push(`forbidden tool for profile ${profile.name}: ${trade.tool}`);
   }
-  if (trade.leg_shape && profile.caps.forbidden_leg_shapes.includes(trade.leg_shape as any)) {
+  if (
+    trade.leg_shape &&
+    (profile.caps.forbidden_leg_shapes as readonly string[]).includes(trade.leg_shape)
+  ) {
     reasons.push(`forbidden leg shape: ${trade.leg_shape}`);
   }
   if (trade.notional_usd > profile.caps.max_order_notional) {

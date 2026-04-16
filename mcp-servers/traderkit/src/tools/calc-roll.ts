@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { uwOptionChain, uwExpiryList, uwStockState } from "../clients/uw-client.js";
+import { TickerSchema, IsoDateSchema } from "../utils/schemas.js";
+import { daysBetween } from "../utils/date.js";
+import { round } from "../utils/math.js";
+import { toMessage } from "../utils/errors.js";
 
 export const CalcRollArgs = z.object({
-  ticker: z.string().min(1).max(10),
+  ticker: TickerSchema,
   option_type: z.enum(["put", "call"]),
   current_strike: z.number().positive(),
-  current_expiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  current_expiry: IsoDateSchema,
   qty: z.number().int().positive().default(1),
   entry_credit_per: z.number().nonnegative().optional(),
   direction: z.enum(["out", "out_and_down", "out_and_up"]).default("out"),
@@ -37,17 +41,6 @@ interface RollCandidate {
   improvement: string;
 }
 
-function daysBetween(fromIso: string, toIso: string): number {
-  const a = new Date(`${fromIso}T16:00:00-04:00`).getTime();
-  const b = new Date(`${toIso}T16:00:00-04:00`).getTime();
-  return Math.round((b - a) / 86_400_000);
-}
-
-function daysUntil(iso: string): number {
-  const t = new Date(`${iso}T16:00:00-04:00`).getTime();
-  return Math.round((t - Date.now()) / 86_400_000);
-}
-
 export async function calcRollHandler(raw: unknown): Promise<{
   btc_cost_per?: number | undefined;
   underlying_price?: number | undefined;
@@ -56,7 +49,7 @@ export async function calcRollHandler(raw: unknown): Promise<{
 }> {
   const args = CalcRollArgs.parse(raw);
   const warnings: string[] = [];
-  const ticker = args.ticker.toUpperCase();
+  const ticker = args.ticker;
 
   const [state, currentChain, expiries] = await Promise.all([
     uwStockState(ticker),
@@ -88,9 +81,19 @@ export async function calcRollHandler(raw: unknown): Promise<{
     return ext >= args.min_dte_extension && ext <= args.max_dte_extension;
   });
 
+  const futureChains = await Promise.all(
+    futureExpiries.map((expiry) =>
+      uwOptionChain(ticker, expiry)
+        .then((chain) => ({ expiry, chain } as const))
+        .catch((e) => {
+          process.stderr.write(`traderkit: uwOptionChain(${ticker}, ${expiry}) failed: ${toMessage(e)}\n`);
+          return { expiry, chain: [] } as const;
+        }),
+    ),
+  );
+
   const rolls: RollCandidate[] = [];
-  for (const expiry of futureExpiries) {
-    const chain = await uwOptionChain(ticker, expiry);
+  for (const { expiry, chain } of futureChains) {
     const legs = chain.filter((c) => c.type === args.option_type);
     for (const leg of legs) {
       if (leg.delta === undefined || leg.mid === undefined || leg.open_interest === undefined) continue;
@@ -125,19 +128,19 @@ export async function calcRollHandler(raw: unknown): Promise<{
 
       rolls.push({
         ticker,
-        btc_cost_per: Number(btcCostPer.toFixed(2)),
+        btc_cost_per: round(btcCostPer),
         new_strike: leg.strike,
         new_expiry: expiry,
         dte_extension: dteExt,
-        sto_credit_per: Number(stoCredit.toFixed(2)),
-        net_credit_per: Number(netCredit.toFixed(2)),
-        net_credit_total: Number((netCredit * 100 * args.qty).toFixed(2)),
-        new_delta: Number(leg.delta.toFixed(4)),
-        new_pop: Number(newPop.toFixed(4)),
+        sto_credit_per: round(stoCredit),
+        net_credit_per: round(netCredit),
+        net_credit_total: round(netCredit * 100 * args.qty),
+        new_delta: round(leg.delta, 10_000),
+        new_pop: round(newPop, 10_000),
         new_oi: leg.open_interest,
         new_iv: leg.iv,
         underlying_price: state.price,
-        score: Number(score.toFixed(4)),
+        score: round(score, 10_000),
         improvement: improvements.join(", "),
       });
     }
@@ -145,7 +148,7 @@ export async function calcRollHandler(raw: unknown): Promise<{
 
   rolls.sort((a, b) => b.score - a.score);
   return {
-    btc_cost_per: Number(btcCostPer.toFixed(2)),
+    btc_cost_per: round(btcCostPer),
     underlying_price: state.price,
     rolls: rolls.slice(0, args.max_results),
     warnings,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { round as roundGeneric } from "../utils/math.js";
 
 export const PerformanceMetricsArgs = z.object({
   returns: z.array(z.number()).min(1),
@@ -115,7 +116,7 @@ export async function performanceMetricsHandler(raw: unknown) {
 }
 
 function round(n: number): number {
-  return Math.round(n * 1e6) / 1e6;
+  return roundGeneric(n, 1e6);
 }
 
 function maybeRound(n: number | null): number | null {

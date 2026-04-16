@@ -51,7 +51,7 @@ export async function connectSnaptradeRead(deps: ClientDeps): Promise<SnaptradeR
   };
 }
 
-function extractActivities(result: unknown): Activity[] {
+export function extractActivities(result: unknown): Activity[] {
   const content = (result as { content?: unknown[] })?.content ?? [];
   const textBlock = content.find((b: unknown) => (b as { type?: string }).type === "text") as { text?: string } | undefined;
   if (!textBlock?.text) return [];

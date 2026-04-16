@@ -1,23 +1,24 @@
 import { z } from "zod";
+import { TickerSchema } from "../utils/schemas.js";
 
 const FitScore = z.enum(["IN_THESIS", "PARTIAL", "OFF_THESIS", "NO_THESIS_REF"]);
 type FitScore = z.infer<typeof FitScore>;
 
 const ThesisEntry = z.object({
   thesis_id: z.string().min(1),
-  tickers: z.array(z.string().min(1)),
+  tickers: z.array(TickerSchema),
   structures: z.array(z.string().min(1)).default([]),
   status: z.enum(["active", "paused", "closed"]).default("active"),
 });
 
 export const ThesisFitArgs = z.object({
   action: z.enum(["score_fit", "batch_score"]),
-  ticker: z.string().min(1).optional(),
+  ticker: TickerSchema.optional(),
   thesis_ref: z.string().optional(),
   structure: z.string().optional(),
   theses: z.array(ThesisEntry),
   holdings: z.array(z.object({
-    ticker: z.string().min(1),
+    ticker: TickerSchema,
     thesis_ref: z.string().optional(),
     structure: z.string().optional(),
   })).optional(),

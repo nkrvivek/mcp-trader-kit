@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { TickerSchema } from "../utils/schemas.js";
+import { round } from "../utils/math.js";
 
 const SignalInput = z.object({
-  ticker: z.string().min(1),
+  ticker: TickerSchema,
   source: z.string().min(1),
   direction: z.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
   confidence: z.number().min(0).max(1),
@@ -30,9 +32,8 @@ export async function signalRankHandler(raw: unknown) {
 
   const byTicker = new Map<string, typeof args.signals>();
   for (const s of args.signals) {
-    const key = s.ticker.toUpperCase();
-    if (!byTicker.has(key)) byTicker.set(key, []);
-    byTicker.get(key)!.push(s);
+    if (!byTicker.has(s.ticker)) byTicker.set(s.ticker, []);
+    byTicker.get(s.ticker)!.push(s);
   }
 
   const ranked: RankedSignal[] = [];
@@ -90,8 +91,4 @@ function dedupBySource(signals: z.infer<typeof SignalInput>[]): z.infer<typeof S
     }
   }
   return [...seen.values()];
-}
-
-function round(n: number): number {
-  return Math.round(n * 100) / 100;
 }

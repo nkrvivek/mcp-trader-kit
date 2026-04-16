@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TickerSchema } from "../utils/schemas.js";
 
 export const TriggerCheckArgs = z.object({
   current_nav: z.number().positive(),
@@ -6,7 +7,7 @@ export const TriggerCheckArgs = z.object({
   current_regime_tier: z.enum(["CLEAR", "CAUTION", "DEFENSIVE", "HALT"]),
   previous_regime_tier: z.enum(["CLEAR", "CAUTION", "DEFENSIVE", "HALT"]).optional(),
   positions: z.array(z.object({
-    ticker: z.string().min(1),
+    ticker: TickerSchema,
     market_value_usd: z.number(),
   })).optional(),
   portfolio_total_usd: z.number().positive().optional(),

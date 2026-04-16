@@ -2,15 +2,15 @@ import { z } from "zod";
 import { checkWashSale } from "../gates/wash-sale.js";
 import type { Profile } from "../profiles/schema.js";
 import type { SnaptradeReadClient } from "../mcp/snaptrade-read-client.js";
+import { TickerSchema } from "../utils/schemas.js";
+import { THIRTY_DAYS_MS } from "../utils/date.js";
 
 export const CheckWashSaleArgs = z.object({
-  ticker: z.string().min(1),
+  ticker: TickerSchema,
   action: z.enum(["BUY", "SELL"]),
   tax_entity: z.string().min(1),
   sell_at_loss: z.boolean().default(false),
 });
-
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function checkWashSaleHandler(
   raw: unknown,

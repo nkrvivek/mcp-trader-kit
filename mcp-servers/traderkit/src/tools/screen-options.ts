@@ -1,9 +1,13 @@
 import { z } from "zod";
 import { uwOptionChain, uwExpiryList, uwIvRank, uwStockState } from "../clients/uw-client.js";
 import { finnhubProfile, finnhubEarnings } from "../clients/finnhub-client.js";
+import { TickerSchema } from "../utils/schemas.js";
+import { daysUntil } from "../utils/date.js";
+import { round } from "../utils/math.js";
+import { toMessage } from "../utils/errors.js";
 
 export const ScreenOptionsArgs = z.object({
-  tickers: z.array(z.string().min(1).max(10)).min(1).max(50),
+  tickers: z.array(TickerSchema).min(1).max(50),
   strategy: z.enum(["csp", "cc", "pcs", "ccs"]).default("csp"),
   dte_min: z.number().int().positive().default(14),
   dte_max: z.number().int().positive().default(45),
@@ -46,11 +50,6 @@ interface Candidate {
   notes: string[];
 }
 
-function daysUntil(isoDate: string): number {
-  const target = new Date(`${isoDate}T16:00:00-04:00`).getTime();
-  return Math.round((target - Date.now()) / 86_400_000);
-}
-
 function isBetween(iso: string | undefined, minDte: number, maxDte: number): boolean {
   if (!iso) return false;
   const d = daysUntil(iso);
@@ -65,8 +64,7 @@ export async function screenOptionsHandler(raw: unknown): Promise<{
   const candidates: Candidate[] = [];
   const skipped: { ticker: string; reason: string }[] = [];
 
-  for (const rawTicker of args.tickers) {
-    const ticker = rawTicker.toUpperCase();
+  for (const ticker of args.tickers) {
     try {
       const [profile, earnings, ivRank, state] = await Promise.all([
         finnhubProfile(ticker),
@@ -91,16 +89,26 @@ export async function screenOptionsHandler(raw: unknown): Promise<{
         continue;
       }
 
-      for (const expiry of eligibleExpiries) {
+      const isPutSide = args.strategy === "csp" || args.strategy === "pcs";
+      const optionType = isPutSide ? "put" : "call";
+      const chains = await Promise.all(
+        eligibleExpiries.map((expiry) =>
+          uwOptionChain(ticker, expiry)
+            .then((chain) => ({ expiry, chain } as const))
+            .catch((e) => {
+              process.stderr.write(`traderkit: uwOptionChain(${ticker}, ${expiry}) failed: ${toMessage(e)}\n`);
+              return { expiry, chain: [] } as const;
+            }),
+        ),
+      );
+
+      for (const { expiry, chain } of chains) {
         const dte = daysUntil(expiry);
         const earningsInWindow = earnings.next_earnings_date
           ? daysUntil(earnings.next_earnings_date) <= dte && daysUntil(earnings.next_earnings_date) >= 0
           : false;
         if (args.avoid_earnings_within_dte && earningsInWindow) continue;
 
-        const chain = await uwOptionChain(ticker, expiry);
-        const isPutSide = args.strategy === "csp" || args.strategy === "pcs";
-        const optionType = isPutSide ? "put" : "call";
         const legs = chain.filter((c) => c.type === optionType);
         for (const leg of legs) {
           if (leg.delta === undefined || leg.mid === undefined || leg.open_interest === undefined) continue;
@@ -143,11 +151,11 @@ export async function screenOptionsHandler(raw: unknown): Promise<{
             long_strike: longStrike,
             expiry,
             dte,
-            credit: Number(netCredit.toFixed(2)),
-            max_risk: maxRisk !== undefined ? Number(maxRisk.toFixed(2)) : undefined,
-            yor: Number(yor.toFixed(4)),
-            short_delta: Number(leg.delta.toFixed(4)),
-            pop: Number(pop.toFixed(4)),
+            credit: round(netCredit),
+            max_risk: maxRisk !== undefined ? round(maxRisk) : undefined,
+            yor: round(yor, 10_000),
+            short_delta: round(leg.delta, 10_000),
+            pop: round(pop, 10_000),
             iv: leg.iv,
             iv_rank: ivRank.iv_rank,
             oi: leg.open_interest,
@@ -157,13 +165,13 @@ export async function screenOptionsHandler(raw: unknown): Promise<{
             sector: profile.sector,
             earnings_date: earnings.next_earnings_date,
             earnings_in_window: earningsInWindow,
-            score: Number(score.toFixed(4)),
+            score: round(score, 10_000),
             notes,
           });
         }
       }
     } catch (err) {
-      skipped.push({ ticker, reason: (err as Error).message.slice(0, 200) });
+      skipped.push({ ticker, reason: toMessage(err).slice(0, 200) });
     }
   }
 

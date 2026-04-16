@@ -1,7 +1,8 @@
 import type { Profile } from "../profiles/schema.js";
 import type { Activity } from "../mcp/snaptrade-read-client.js";
+import { THIRTY_DAYS_MS } from "../utils/date.js";
 
-const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const WINDOW_MS = THIRTY_DAYS_MS;
 
 export interface WashSaleContext {
   action: "BUY" | "SELL";

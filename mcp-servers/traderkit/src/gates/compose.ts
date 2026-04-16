@@ -2,6 +2,8 @@ import type { Profile } from "../profiles/schema.js";
 import type { Activity } from "../mcp/snaptrade-read-client.js";
 import { checkCaps, type TradeProposal, type GateResult } from "./caps.js";
 import { checkWashSale } from "./wash-sale.js";
+import { THIRTY_DAYS_MS } from "../utils/date.js";
+import { toMessage } from "../utils/errors.js";
 
 export interface ComposeInput {
   profile: Profile;
@@ -11,8 +13,6 @@ export interface ComposeInput {
   requireWashSaleCheck?: boolean;
   now?: Date;
 }
-
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function composeCheckTrade(input: ComposeInput): Promise<GateResult> {
   const caps = checkCaps(input.profile, input.trade);
@@ -29,7 +29,7 @@ export async function composeCheckTrade(input: ComposeInput): Promise<GateResult
   try {
     activities = await input.fetchActivities(poolAccounts, since);
   } catch (e) {
-    const msg = `wash-sale check unavailable: ${(e as Error).message}`;
+    const msg = `wash-sale check unavailable: ${toMessage(e)}`;
     if (input.requireWashSaleCheck) reasons.push(`wash-sale check required but ${msg}`);
     else warnings.push(msg);
     return { pass: reasons.length === 0, reasons, warnings };

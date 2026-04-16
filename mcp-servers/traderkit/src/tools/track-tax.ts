@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { TickerSchema, IsoDateSchema } from "../utils/schemas.js";
+import { round } from "../utils/math.js";
 
 const RealizedTrade = z.object({
-  ticker: z.string().min(1),
+  ticker: TickerSchema,
   realized_pnl: z.number(),
   hold_days: z.number().nonnegative(),
-  date: z.string().min(1),
+  date: IsoDateSchema,
   broker: z.string().optional(),
   wash_sale_adjusted: z.boolean().default(false),
 });
@@ -97,8 +99,4 @@ export async function trackTaxHandler(raw: unknown) {
     breakdown: breakdown.sort((a, b) => a.date.localeCompare(b.date)),
     wash_sale_count: args.trades.filter((t) => t.wash_sale_adjusted).length,
   };
-}
-
-function round(n: number): number {
-  return Math.round(n * 100) / 100;
 }

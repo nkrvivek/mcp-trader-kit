@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { IsoDateSchema } from "../utils/schemas.js";
 
 export const TradingCalendarArgs = z.object({
   action: z.enum(["is_trading_day", "next_trading_day", "prev_trading_day", "last_trading_day_of_month", "trading_days_between"]),
-  date: z.string().min(1),
-  end_date: z.string().optional(),
+  date: IsoDateSchema,
+  end_date: IsoDateSchema.optional(),
 });
 
 function dateFromStr(s: string): Date {

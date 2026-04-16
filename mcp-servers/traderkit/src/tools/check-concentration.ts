@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { Profile } from "../profiles/schema.js";
+import { TickerSchema } from "../utils/schemas.js";
+import { concentrationLabel } from "../utils/concentration.js";
 
 export const CheckConcentrationArgs = z.object({
   profile: z.string().min(1),
   positions: z.array(z.object({
-    ticker: z.string().min(1),
+    ticker: TickerSchema,
     market_value_usd: z.number(),
   })),
   portfolio_total_usd: z.number().positive(),
@@ -16,13 +18,6 @@ export interface ConcentrationEntry {
   market_value_usd: number;
   label: string;
   over_cap_by_pct: number;
-}
-
-function label(pct: number, cap: number): string {
-  if (pct > cap) return "OVER-CAP";
-  if (pct > cap * 0.9) return "NEAR-CAP";
-  if (pct > cap * 0.75) return "AT-CAP";
-  return "HEADROOM";
 }
 
 export async function checkConcentrationHandler(
@@ -43,7 +38,7 @@ export async function checkConcentrationHandler(
         ticker: p.ticker,
         pct: Math.round(pct * 10) / 10,
         market_value_usd: p.market_value_usd,
-        label: label(pct, cap),
+        label: concentrationLabel(pct, cap),
         over_cap_by_pct: Math.round(Math.max(0, pct - cap) * 10) / 10,
       };
     })

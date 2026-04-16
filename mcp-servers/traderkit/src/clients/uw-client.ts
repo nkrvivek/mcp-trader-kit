@@ -1,4 +1,6 @@
-const UW_BASE = "https://api.unusualwhales.com/api";
+import { toMessage } from "../utils/errors.js";
+
+const UW_BASE = process.env.UW_BASE ?? "https://api.unusualwhales.com/api";
 
 export interface UWOptionContract {
   option_symbol: string;
@@ -25,7 +27,12 @@ export interface UWIvRank {
   iv30?: number | undefined;
 }
 
-async function uwGet(path: string, params: Record<string, string | number | undefined>): Promise<any> {
+function sanitizeBody(body: string, token: string): string {
+  const stripped = token ? body.split(token).join("[redacted]") : body;
+  return stripped.replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]").slice(0, 200);
+}
+
+async function uwGet(path: string, params: Record<string, string | number | undefined>): Promise<unknown> {
   const token = process.env.UW_TOKEN;
   if (!token) throw new Error("UW_TOKEN not set");
   const qs = new URLSearchParams();
@@ -49,7 +56,7 @@ async function uwGet(path: string, params: Record<string, string | number | unde
         await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
         continue;
       }
-      throw new Error(`UW ${res.status} ${path}: ${body.slice(0, 200)}`);
+      throw new Error(`UW ${res.status} ${path}: ${sanitizeBody(body, token)}`);
     }
     try {
       return JSON.parse(body);
@@ -83,10 +90,19 @@ function parseOccSymbol(sym: string): { ticker: string; expiry: string; type: "c
   };
 }
 
-function toNum(x: any): number | undefined {
+function toNum(x: unknown): number | undefined {
   if (x === null || x === undefined || x === "") return undefined;
   const n = Number(x);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function asRecord(x: unknown): Record<string, unknown> {
+  return x && typeof x === "object" ? (x as Record<string, unknown>) : {};
+}
+
+function dataArray(x: unknown): Record<string, unknown>[] {
+  const rec = asRecord(x);
+  return Array.isArray(rec.data) ? (rec.data as Record<string, unknown>[]) : [];
 }
 
 export async function uwOptionChain(ticker: string, expiry: string): Promise<UWOptionContract[]> {
@@ -94,17 +110,20 @@ export async function uwOptionChain(ticker: string, expiry: string): Promise<UWO
   const today = new Date().toISOString().slice(0, 10);
   const [quotesJson, greeksJson] = await Promise.all([
     uwGet(`/stock/${T}/option-contracts`, { expiry }),
-    uwGet(`/stock/${T}/greeks`, { expiry, date: today }).catch(() => ({ data: [] })),
+    uwGet(`/stock/${T}/greeks`, { expiry, date: today }).catch((e) => {
+      process.stderr.write(`traderkit: uw greeks(${T}, ${expiry}) failed: ${toMessage(e)}\n`);
+      return { data: [] };
+    }),
   ]);
 
-  const greekRows: any[] = Array.isArray(greeksJson?.data) ? greeksJson.data : [];
-  const greeksBySym = new Map<string, any>();
+  const greekRows = dataArray(greeksJson);
+  const greeksBySym = new Map<string, { side: "call" | "put"; row: Record<string, unknown> }>();
   for (const row of greekRows) {
     if (row.call_option_symbol) greeksBySym.set(String(row.call_option_symbol), { side: "call", row });
     if (row.put_option_symbol) greeksBySym.set(String(row.put_option_symbol), { side: "put", row });
   }
 
-  const quoteRows: any[] = Array.isArray(quotesJson?.data) ? quotesJson.data : [];
+  const quoteRows = dataArray(quotesJson);
   const out: UWOptionContract[] = [];
   for (const q of quoteRows) {
     const sym = String(q.option_symbol ?? "");
@@ -142,37 +161,40 @@ export async function uwOptionChain(ticker: string, expiry: string): Promise<UWO
 
 export async function uwExpiryList(ticker: string): Promise<string[]> {
   const json = await uwGet(`/stock/${ticker.toUpperCase()}/expiry-breakdown`, {});
-  const raw: any[] = Array.isArray(json?.data) ? json.data : [];
-  return raw.map((r) => String(r.expires ?? r.expiry ?? "")).filter(Boolean);
+  return dataArray(json).map((r) => String(r.expires ?? r.expiry ?? "")).filter(Boolean);
 }
 
 export async function uwIvRank(ticker: string): Promise<UWIvRank> {
+  const T = ticker.toUpperCase();
   try {
-    const json = await uwGet(`/stock/${ticker.toUpperCase()}/iv-rank`, {});
-    const rows: any[] = Array.isArray(json?.data) ? json.data : [json?.data ?? {}];
-    const latest = rows.length ? rows[rows.length - 1] : {};
+    const json = await uwGet(`/stock/${T}/iv-rank`, {});
+    const rows = dataArray(json);
+    const latest = rows.length ? rows[rows.length - 1]! : {};
     return {
-      ticker: ticker.toUpperCase(),
+      ticker: T,
       iv_rank: toNum(latest.iv_rank),
       iv_percentile: toNum(latest.iv_percentile),
       iv30: toNum(latest.iv30 ?? latest.iv),
     };
-  } catch {
-    return { ticker: ticker.toUpperCase() };
+  } catch (e) {
+    process.stderr.write(`traderkit: uwIvRank(${T}) failed: ${toMessage(e)}\n`);
+    return { ticker: T };
   }
 }
 
 export async function uwStockState(ticker: string): Promise<{ price?: number | undefined; change_pct?: number | undefined }> {
+  const T = ticker.toUpperCase();
   try {
-    const json = await uwGet(`/stock/${ticker.toUpperCase()}/stock-state`, {});
-    const d = json?.data ?? {};
+    const json = await uwGet(`/stock/${T}/stock-state`, {});
+    const d = asRecord(asRecord(json).data);
     const close = toNum(d.close);
     const prev = toNum(d.prev_close);
     return {
       price: close,
       change_pct: close !== undefined && prev !== undefined && prev > 0 ? (close - prev) / prev : undefined,
     };
-  } catch {
+  } catch (e) {
+    process.stderr.write(`traderkit: uwStockState(${T}) failed: ${toMessage(e)}\n`);
     return {};
   }
 }

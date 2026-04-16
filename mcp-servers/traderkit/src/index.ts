@@ -2,8 +2,9 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { ZodObject, ZodRawShape } from "zod";
 import { loadAllProfiles } from "./profiles/loader.js";
-import { KIT_ROOT, PROFILES_DIR } from "./config.js";
+import { PROFILES_DIR } from "./config.js";
 import { connectSnaptradeRead, type SnaptradeReadClient } from "./mcp/snaptrade-read-client.js";
 import { CheckTradeArgs, checkTradeHandler } from "./tools/check-trade.js";
 import { CheckWashSaleArgs, checkWashSaleHandler } from "./tools/check-wash-sale.js";
@@ -26,63 +27,64 @@ import { ScreenOptionsArgs, screenOptionsHandler } from "./tools/screen-options.
 import { CalcRollArgs, calcRollHandler } from "./tools/calc-roll.js";
 import { redact } from "./redact.js";
 
+function toolInput<S extends ZodRawShape>(
+  schema: ZodObject<S>,
+  required: readonly (keyof S & string)[],
+) {
+  return {
+    type: "object" as const,
+    additionalProperties: false as const,
+    properties: schema.shape,
+    required: [...required],
+  };
+}
+
+const EMPTY_INPUT = {
+  type: "object" as const,
+  additionalProperties: false as const,
+  properties: {},
+  required: [] as string[],
+};
+
 const TOOLS = [
   { name: "check_trade", description: "Gate a proposed trade (caps + wash-sale).",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: CheckTradeArgs.shape as any, required: ["profile", "tool", "ticker", "direction", "qty", "notional_usd"] } },
+    inputSchema: toolInput(CheckTradeArgs, ["profile", "tool", "ticker", "direction", "qty", "notional_usd"]) },
   { name: "check_wash_sale", description: "Check wash-sale status for a ticker + action.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: CheckWashSaleArgs.shape as any, required: ["ticker", "action", "tax_entity"] } },
+    inputSchema: toolInput(CheckWashSaleArgs, ["ticker", "action", "tax_entity"]) },
   { name: "list_profiles", description: "List available trading profiles.",
-    inputSchema: { type: "object", additionalProperties: false, properties: {} } },
+    inputSchema: EMPTY_INPUT },
   { name: "set_profile", description: "Set the active profile in session state.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: SetProfileArgs.shape as any, required: ["name"] } },
+    inputSchema: toolInput(SetProfileArgs, ["name"]) },
   { name: "scan_tlh", description: "Scan positions for tax-loss harvesting candidates (wash-sale-clean).",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: ScanTlhArgs.shape as any, required: ["tax_entity", "positions"] } },
+    inputSchema: toolInput(ScanTlhArgs, ["tax_entity", "positions"]) },
   { name: "check_concentration", description: "Analyze portfolio concentration vs profile caps. Returns per-position labels (HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP) and HHI.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: CheckConcentrationArgs.shape as any, required: ["profile", "positions", "portfolio_total_usd"] } },
+    inputSchema: toolInput(CheckConcentrationArgs, ["profile", "positions", "portfolio_total_usd"]) },
   { name: "regime_gate", description: "Check if a trade is allowed under the current market regime. Returns adjusted sizing, blocked actions, and preferred structures.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: RegimeGateArgs.shape as any, required: ["regime_tier", "direction", "notional_usd"] } },
+    inputSchema: toolInput(RegimeGateArgs, ["regime_tier", "direction", "notional_usd"]) },
   { name: "propose_trade", description: "Assemble a sized trade proposal with concentration headroom, regime adjustment, and cap check.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: ProposeTradeArgs.shape as any, required: ["profile", "ticker", "direction", "current_price", "portfolio_total_usd"] } },
+    inputSchema: toolInput(ProposeTradeArgs, ["profile", "ticker", "direction", "current_price", "portfolio_total_usd"]) },
   { name: "track_tax", description: "Compute running STCG/LTCG tax exposure from realized trades. Returns per-trade breakdown and reserve amounts.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: TrackTaxArgs.shape as any, required: ["trades"] } },
+    inputSchema: toolInput(TrackTaxArgs, ["trades"]) },
   { name: "trigger_check", description: "Check for triggered events: NAV moves, regime shifts, concentration breaches. Returns severity-sorted event list.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: TriggerCheckArgs.shape as any, required: ["current_nav", "previous_nav", "current_regime_tier"] } },
+    inputSchema: toolInput(TriggerCheckArgs, ["current_nav", "previous_nav", "current_regime_tier"]) },
   { name: "signal_rank", description: "Rank trading signals by composite confidence. Multi-source confirmation boosts score. Deduplicates by (ticker, source).",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: SignalRankArgs.shape as any, required: ["signals"] } },
+    inputSchema: toolInput(SignalRankArgs, ["signals"]) },
   { name: "classify_holding", description: "Classify holdings into tiers (CORE/OPPORTUNISTIC/SPECULATIVE/PURE_SPECULATIVE) based on NAV weight, thesis, and program membership.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: ClassifyHoldingArgs.shape as any, required: ["holdings", "portfolio_total_usd"] } },
+    inputSchema: toolInput(ClassifyHoldingArgs, ["holdings", "portfolio_total_usd"]) },
   { name: "trading_calendar", description: "NYSE trading calendar: check trading days, find next/prev trading day, last trading day of month, count trading days between dates.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: TradingCalendarArgs.shape as any, required: ["action", "date"] } },
+    inputSchema: toolInput(TradingCalendarArgs, ["action", "date"]) },
   { name: "performance_metrics", description: "Compute portfolio performance metrics: Sharpe, Sortino, max drawdown, Calmar ratio, win rate from a returns series.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: PerformanceMetricsArgs.shape as any, required: ["returns"] } },
+    inputSchema: toolInput(PerformanceMetricsArgs, ["returns"]) },
   { name: "thesis_fit", description: "Score how well a trade fits active theses (IN_THESIS/PARTIAL/OFF_THESIS/NO_THESIS_REF). Supports single and batch scoring.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: ThesisFitArgs.shape as any, required: ["action", "theses"] } },
+    inputSchema: toolInput(ThesisFitArgs, ["action", "theses"]) },
   { name: "session_write", description: "Format session document sections: executed trades table, deferred list, no-trade log, session index row.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: SessionWriteArgs.shape as any, required: ["action"] } },
+    inputSchema: toolInput(SessionWriteArgs, ["action"]) },
   { name: "broker_route", description: "Classify broker routing: SNAPTRADE/TRADESTATION/MANUAL/DEFERRED based on broker name and deferred tags.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: BrokerRouteArgs.shape as any, required: ["broker", "direction"] } },
+    inputSchema: toolInput(BrokerRouteArgs, ["broker", "direction"]) },
   { name: "screen_options", description: "Screen option-selling candidates (CSP/CC/PCS/CCS) by IV rank, delta, DTE, credit, YoR, OI, earnings window. Returns ranked candidates w/ fundamentals (mkt cap, sector) + option Greeks from UW + Finnhub.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: ScreenOptionsArgs.shape as any, required: ["tickers"] } },
+    inputSchema: toolInput(ScreenOptionsArgs, ["tickers"]) },
   { name: "calc_roll", description: "Find roll candidates for an existing short option. Credit-first: filters strikes/expiries where STO_credit − BTC_cost >= min_net_credit. Ranks by (net_credit / DTE_ext) × new_POP.",
-    inputSchema: { type: "object", additionalProperties: false,
-      properties: CalcRollArgs.shape as any, required: ["ticker", "option_type", "current_strike", "current_expiry"] } },
+    inputSchema: toolInput(CalcRollArgs, ["ticker", "option_type", "current_strike", "current_expiry"]) },
 ];
 
 const SECRETS = [
@@ -90,6 +92,24 @@ const SECRETS = [
   process.env.SNAPTRADE_USER_ID, process.env.SNAPTRADE_CLIENT_ID,
   process.env.UW_TOKEN, process.env.FINNHUB_API_KEY,
 ].filter((x): x is string => !!x);
+
+const SNAPTRADE_READ_ALLOWED_ENV = [
+  "SNAPTRADE_CONSUMER_KEY",
+  "SNAPTRADE_USER_SECRET",
+  "SNAPTRADE_USER_ID",
+  "SNAPTRADE_CLIENT_ID",
+  "PATH",
+  "HOME",
+] as const;
+
+function allowedEnv(allowlist: readonly string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of allowlist) {
+    const v = process.env[k];
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
 
 async function main() {
   const allProfiles = await loadAllProfiles(PROFILES_DIR).catch(() => []);
@@ -99,14 +119,14 @@ async function main() {
       snaptradeRead = await connectSnaptradeRead({
         command: process.env.SNAPTRADE_READ_COMMAND,
         args: (process.env.SNAPTRADE_READ_ARGS ?? "").split(" ").filter(Boolean),
-        env: process.env as Record<string, string>,
+        env: allowedEnv(SNAPTRADE_READ_ALLOWED_ENV),
       });
     } catch (e) {
       process.stderr.write(`traderkit: could not start snaptrade-read: ${(e as Error).message}\n`);
     }
   }
 
-  const server = new Server({ name: "traderkit", version: "0.5.0" }, { capabilities: { tools: {} } });
+  const server = new Server({ name: "traderkit", version: "0.5.1" }, { capabilities: { tools: {} } });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const deps = { allProfiles, snaptradeRead };
@@ -143,7 +163,7 @@ async function main() {
     }
   });
   await server.connect(new StdioServerTransport());
-  process.stderr.write(`traderkit: ready (profiles=${allProfiles.length}, kit_root=${KIT_ROOT})\n`);
+  process.stderr.write(`traderkit: ready (profiles=${allProfiles.length})\n`);
 }
 
 main().catch((e) => { process.stderr.write(`traderkit fatal: ${e?.message}\n`); process.exit(1); });

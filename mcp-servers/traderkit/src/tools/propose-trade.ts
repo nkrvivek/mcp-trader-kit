@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { Profile } from "../profiles/schema.js";
+import { concentrationLabel } from "../utils/concentration.js";
+import { round } from "../utils/math.js";
 
 export const ProposeTradeArgs = z.object({
   profile: z.string().min(1),
@@ -24,13 +26,6 @@ const BLOCKED_DIRECTIONS: Record<string, string[]> = {
   DEFENSIVE: ["BUY", "BUY_TO_OPEN"],
   HALT: ["BUY", "BUY_TO_OPEN", "SELL_TO_OPEN"],
 };
-
-function concentrationLabel(pct: number, cap: number): string {
-  if (pct > cap) return "OVER-CAP";
-  if (pct > cap * 0.9) return "NEAR-CAP";
-  if (pct > cap * 0.75) return "AT-CAP";
-  return "HEADROOM";
-}
 
 export async function proposeTradeHandler(
   raw: unknown,
@@ -109,8 +104,4 @@ export async function proposeTradeHandler(
     signal_summary: args.signal_summary ?? null,
     cap_check: adjustedSizeUsd <= profile.caps.max_order_notional ? "PASS" : "CAPPED",
   };
-}
-
-function round(n: number): number {
-  return Math.round(n * 100) / 100;
 }

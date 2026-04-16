@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { TickerSchema, IsoDateSchema } from "../utils/schemas.js";
 
 const ExecutedTrade = z.object({
-  ticker: z.string().min(1),
+  ticker: TickerSchema,
   direction: z.string().min(1),
   qty: z.number(),
   price: z.number(),
@@ -11,21 +12,21 @@ const ExecutedTrade = z.object({
 });
 
 const DeferredTrade = z.object({
-  ticker: z.string().min(1),
+  ticker: TickerSchema,
   direction: z.string().min(1),
   reason: z.string().min(1),
   tag: z.string().default("deferred"),
 });
 
 const NoTradeEntry = z.object({
-  ticker: z.string().min(1),
+  ticker: TickerSchema,
   reason: z.string().min(1),
 });
 
 export const SessionWriteArgs = z.object({
   action: z.enum(["format_executed", "format_deferred", "format_no_trade", "format_session_index_row"]),
   session_id: z.string().min(1).optional(),
-  date: z.string().min(1).optional(),
+  date: IsoDateSchema.optional(),
   book: z.string().min(1).optional(),
   nav: z.number().optional(),
   regime_tier: z.string().optional(),

@@ -4,14 +4,34 @@
   "description": "Risk gate MCP for trading — caps, wash-sale, TLH.",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=20" },
-  "bin": { "traderkit": "dist/index.js" },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "traderkit": "dist/index.js"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
-  "publishConfig": { "access": "public" },
-  "repository": { "type": "git", "url": "git+https://github.com/nkrvivek/traderkit.git", "directory": "mcp-servers/traderkit" },
-  "keywords": ["mcp", "trading", "snaptrade", "claude", "risk-gate", "wash-sale", "traderkit"],
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nkrvivek/traderkit.git",
+    "directory": "mcp-servers/traderkit"
+  },
+  "keywords": [
+    "mcp",
+    "trading",
+    "snaptrade",
+    "claude",
+    "risk-gate",
+    "wash-sale",
+    "traderkit"
+  ],
   "homepage": "https://github.com/nkrvivek/traderkit",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -26,8 +46,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "typescript": "^5.6.0",
-    "vitest": "^2.0.0"
+    "vitest": "^3.2.4"
   }
 }

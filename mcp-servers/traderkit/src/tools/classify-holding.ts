@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { TickerSchema } from "../utils/schemas.js";
 
 const HoldingInput = z.object({
-  ticker: z.string().min(1),
+  ticker: TickerSchema,
   market_value_usd: z.number(),
   has_active_thesis: z.boolean().default(false),
   in_options_program: z.boolean().default(false),
