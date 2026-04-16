@@ -15,9 +15,9 @@ if (!ACCOUNT_ID || !PROFILE) {
 }
 
 console.log(`Smoke test: profile=${PROFILE} account=${ACCOUNT_ID}`);
-console.log("1. Invoking trade-guard.check_trade on a $1 SPY BUY (should PASS if caps allow).");
+console.log("1. Invoking traderkit.check_trade on a $1 SPY BUY (should PASS if caps allow).");
 console.log("2. Instructing user to call mcp__snaptrade-trade__equity_force_place from Claude Code.");
-console.log("3. User should observe hook emits 'trade-guard: pass' on stderr.");
+console.log("3. User should observe hook emits 'traderkit: pass' on stderr.");
 console.log("4. Immediately cancel via mcp__snaptrade-trade__cancel_order.");
 console.log();
 console.log("This script does not itself call SnapTrade — it's a guided manual E2E.");

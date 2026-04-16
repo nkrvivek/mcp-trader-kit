@@ -37,7 +37,7 @@ AI Assistant ──PreToolUse hook──► traderkit MCP (17 tools)
 | **Proposal + tax** | `propose_trade`, `track_tax`, `signal_rank`, `thesis_fit`, `broker_route` |
 | **Session management** | `list_profiles`, `set_profile`, `trading_calendar`, `session_write` |
 
-See the [npm package README](mcp-servers/trade-guard/README.md) for detailed documentation of each tool.
+See the [npm package README](mcp-servers/traderkit/README.md) for detailed documentation of each tool.
 
 ## Full setup
 

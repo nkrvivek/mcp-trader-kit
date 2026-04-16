@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { getActiveProfile, setActiveProfile, clearActiveProfile } from "../../src/profiles/session.js";
 
 let root: string;
-beforeEach(async () => { root = await mkdtemp(join(tmpdir(), "trade-guard-test-")); });
+beforeEach(async () => { root = await mkdtemp(join(tmpdir(), "traderkit-test-")); });
 afterEach(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("session profile state", () => {

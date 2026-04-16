@@ -76,4 +76,4 @@ Try: "list positions in `<profile>`", then a small proposal. Verify the hook fir
 
 - **Hook never fires:** check `.claude/settings.json` matcher pattern — tool names must start with `mcp__<server-name>__<tool-name>`.
 - **Wash-sale check always returns unavailable:** confirm `SNAPTRADE_READ_COMMAND=npx SNAPTRADE_READ_ARGS="-y snaptrade-mcp-ts"` is in the env when traderkit launches (Claude Code inherits the project env).
-- **Profile not found:** `trade-guard.list_profiles` should show the file name (without `.md`) — if empty, verify YAML frontmatter parses and `TRADERKIT_ROOT` points where you think.
+- **Profile not found:** `traderkit.list_profiles` should show the file name (without `.md`) — if empty, verify YAML frontmatter parses and `TRADERKIT_ROOT` points where you think.

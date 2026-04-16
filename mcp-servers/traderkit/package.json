@@ -10,7 +10,7 @@
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "publishConfig": { "access": "public" },
-  "repository": { "type": "git", "url": "git+https://github.com/nkrvivek/traderkit.git", "directory": "mcp-servers/trade-guard" },
+  "repository": { "type": "git", "url": "git+https://github.com/nkrvivek/traderkit.git", "directory": "mcp-servers/traderkit" },
   "keywords": ["mcp", "trading", "snaptrade", "claude", "risk-gate", "wash-sale", "traderkit"],
   "homepage": "https://github.com/nkrvivek/traderkit",
   "scripts": {

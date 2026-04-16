@@ -22,6 +22,8 @@ import { PerformanceMetricsArgs, performanceMetricsHandler } from "./tools/perfo
 import { ThesisFitArgs, thesisFitHandler } from "./tools/thesis-fit.js";
 import { SessionWriteArgs, sessionWriteHandler } from "./tools/session-write.js";
 import { BrokerRouteArgs, brokerRouteHandler } from "./tools/broker-route.js";
+import { ScreenOptionsArgs, screenOptionsHandler } from "./tools/screen-options.js";
+import { CalcRollArgs, calcRollHandler } from "./tools/calc-roll.js";
 import { redact } from "./redact.js";
 
 const TOOLS = [
@@ -75,11 +77,18 @@ const TOOLS = [
   { name: "broker_route", description: "Classify broker routing: SNAPTRADE/TRADESTATION/MANUAL/DEFERRED based on broker name and deferred tags.",
     inputSchema: { type: "object", additionalProperties: false,
       properties: BrokerRouteArgs.shape as any, required: ["broker", "direction"] } },
+  { name: "screen_options", description: "Screen option-selling candidates (CSP/CC/PCS/CCS) by IV rank, delta, DTE, credit, YoR, OI, earnings window. Returns ranked candidates w/ fundamentals (mkt cap, sector) + option Greeks from UW + Finnhub.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: ScreenOptionsArgs.shape as any, required: ["tickers"] } },
+  { name: "calc_roll", description: "Find roll candidates for an existing short option. Credit-first: filters strikes/expiries where STO_credit − BTC_cost >= min_net_credit. Ranks by (net_credit / DTE_ext) × new_POP.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: CalcRollArgs.shape as any, required: ["ticker", "option_type", "current_strike", "current_expiry"] } },
 ];
 
 const SECRETS = [
   process.env.SNAPTRADE_CONSUMER_KEY, process.env.SNAPTRADE_USER_SECRET,
   process.env.SNAPTRADE_USER_ID, process.env.SNAPTRADE_CLIENT_ID,
+  process.env.UW_TOKEN, process.env.FINNHUB_API_KEY,
 ].filter((x): x is string => !!x);
 
 async function main() {
@@ -93,7 +102,7 @@ async function main() {
         env: process.env as Record<string, string>,
       });
     } catch (e) {
-      process.stderr.write(`trade-guard: could not start snaptrade-read: ${(e as Error).message}\n`);
+      process.stderr.write(`traderkit: could not start snaptrade-read: ${(e as Error).message}\n`);
     }
   }
 
@@ -121,6 +130,8 @@ async function main() {
         case "thesis_fit":     result = await thesisFitHandler(req.params.arguments); break;
         case "session_write":  result = await sessionWriteHandler(req.params.arguments); break;
         case "broker_route":   result = await brokerRouteHandler(req.params.arguments); break;
+        case "screen_options": result = await screenOptionsHandler(req.params.arguments); break;
+        case "calc_roll":      result = await calcRollHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
@@ -132,7 +143,7 @@ async function main() {
     }
   });
   await server.connect(new StdioServerTransport());
-  process.stderr.write(`trade-guard: ready (profiles=${allProfiles.length}, kit_root=${KIT_ROOT})\n`);
+  process.stderr.write(`traderkit: ready (profiles=${allProfiles.length}, kit_root=${KIT_ROOT})\n`);
 }
 
-main().catch((e) => { process.stderr.write(`trade-guard fatal: ${e?.message}\n`); process.exit(1); });
+main().catch((e) => { process.stderr.write(`traderkit fatal: ${e?.message}\n`); process.exit(1); });

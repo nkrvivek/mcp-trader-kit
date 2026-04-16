@@ -30,7 +30,7 @@ export async function connectSnaptradeRead(deps: ClientDeps): Promise<SnaptradeR
   if (deps.env !== undefined) serverParams.env = deps.env;
 
   const transport = new StdioClientTransport(serverParams);
-  const client = new Client({ name: "trade-guard", version: "0.1.0" }, { capabilities: {} });
+  const client = new Client({ name: "traderkit", version: "0.1.0" }, { capabilities: {} });
   await client.connect(transport);
   const cache = new TtlCache<Activity[]>(ACTIVITIES_CACHE_TTL_MS);
 

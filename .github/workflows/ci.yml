@@ -14,4 +14,4 @@ jobs:
       - run: npm run build
       - run: npm run test
       - uses: codecov/codecov-action@v4
-        with: { files: mcp-servers/trade-guard/coverage/lcov.info }
+        with: { files: mcp-servers/traderkit/coverage/lcov.info }

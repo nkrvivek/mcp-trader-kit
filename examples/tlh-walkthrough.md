@@ -2,7 +2,7 @@
 
 ```
 User: what's harvestable in personal?
-Claude: [calls trade-guard.scan_tlh({tax_entity: "personal", threshold_usd: 500})]
+Claude: [calls traderkit.scan_tlh({tax_entity: "personal", threshold_usd: 500})]
 Candidates (wash-sale-clean, sorted by loss size):
 1. AAPL — $2,000 unrealized loss, 100 sh in personal-fid
 2. QQQ — $800 unrealized loss, 10 sh in personal-fid
