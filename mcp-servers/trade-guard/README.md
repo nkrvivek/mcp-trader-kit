@@ -239,12 +239,12 @@ In Claude Code: ask "list profiles" to confirm the server is connected.
 |----------|----------|-------------|
 | `TRADERKIT_ROOT` | No | Config root (default: `~/.traderkit`) |
 | `TRADERKIT_FAIL_OPEN` | No | Set `true` to allow trades when server is unreachable (default: fail closed) |
-| `SNAPTRADE_CONSUMER_KEY` | For wash-sale + TLH | SnapTrade credentials for activity lookups |
-| `SNAPTRADE_USER_SECRET` | For wash-sale + TLH | |
-| `SNAPTRADE_USER_ID` | For wash-sale + TLH | |
-| `SNAPTRADE_CLIENT_ID` | For wash-sale + TLH | |
-| `SNAPTRADE_READ_COMMAND` | For wash-sale + TLH | Command to spawn snaptrade-mcp-ts (e.g., `npx`) |
-| `SNAPTRADE_READ_ARGS` | For wash-sale + TLH | Args for the command (e.g., `-y snaptrade-mcp-ts`) |
+| `SNAPTRADE_CONSUMER_KEY` | For SnapTrade | SnapTrade credentials — used here for activity lookups (wash-sale, TLH) and by companion [snaptrade-mcp-ts](https://www.npmjs.com/package/snaptrade-mcp-ts) for trade execution |
+| `SNAPTRADE_USER_SECRET` | For SnapTrade | |
+| `SNAPTRADE_USER_ID` | For SnapTrade | |
+| `SNAPTRADE_CLIENT_ID` | For SnapTrade | |
+| `SNAPTRADE_READ_COMMAND` | For SnapTrade | Command to spawn snaptrade-mcp-ts (e.g., `npx`) |
+| `SNAPTRADE_READ_ARGS` | For SnapTrade | Args for the command (e.g., `-y snaptrade-mcp-ts`) |
 
 ## How it works
 
