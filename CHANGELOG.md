@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0] — 2026-04-16
+
+### traderkit
+- New tools: `signal_rank`, `classify_holding`.
+- `signal_rank`: multi-source confidence boosting, dedup by (ticker, source), direction voting.
+- `classify_holding`: 5-tier holding classification (CORE/OPPORTUNISTIC/SPECULATIVE/PURE_SPECULATIVE/UNCLASSIFIED).
+- Enhanced PreToolUse hook: chains `check_trade` + `regime_gate` (when regime ≠ CLEAR).
+- Security: removed hardcoded LLC entity names from schema — `tax_entity` is now a free kebab-case string.
+- Security: genericized LLC template entity names.
+
 ## [0.3.0] — 2026-04-16
 
 ### traderkit

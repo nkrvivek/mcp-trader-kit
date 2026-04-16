@@ -2,13 +2,13 @@
 name: example-llc
 broker: snaptrade
 account_id: 00000000-0000-0000-0000-000000000000
-tax_entity: llc-bildof
+tax_entity: llc-mycompany
 caps:
   max_order_notional: 5000
   max_single_name_pct: 10
   forbidden_tools: []
   forbidden_leg_shapes: [naked_put, naked_call, naked_straddle, naked_strangle]
-vault_link: bildof/log.md
+vault_link: llc/log.md
 ---
 
 # example-llc profile

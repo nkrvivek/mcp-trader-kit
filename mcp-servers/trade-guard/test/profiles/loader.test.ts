@@ -32,9 +32,9 @@ describe("parseProfile", () => {
     expect(() => parseProfile(bad)).toThrow(/name/);
   });
 
-  it("rejects unknown tax_entity", () => {
-    const bad = VALID.replace("tax_entity: llc-bildof", "tax_entity: offshore");
-    expect(() => parseProfile(bad)).toThrow(/tax_entity/);
+  it("rejects invalid tax_entity format", () => {
+    const bad = VALID.replace("tax_entity: llc-bildof", "tax_entity: Invalid Entity!");
+    expect(() => parseProfile(bad)).toThrow(/tax/i);
   });
 
   it("rejects non-UUID account_id", () => {

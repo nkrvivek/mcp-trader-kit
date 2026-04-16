@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const TaxEntity = z.enum(["personal", "llc-bildof", "llc-innocore"]);
+export const TaxEntity = z.string().min(1).max(50).regex(/^[a-z0-9-]+$/, "lowercase-kebab tax entity");
 export type TaxEntity = z.infer<typeof TaxEntity>;
 
 export const Broker = z.enum(["snaptrade", "tradestation", "ibkr-direct"]);

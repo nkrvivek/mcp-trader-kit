@@ -6,7 +6,7 @@ import type { SnaptradeReadClient } from "../mcp/snaptrade-read-client.js";
 export const CheckWashSaleArgs = z.object({
   ticker: z.string().min(1),
   action: z.enum(["BUY", "SELL"]),
-  tax_entity: z.enum(["personal", "llc-bildof", "llc-innocore"]),
+  tax_entity: z.string().min(1),
   sell_at_loss: z.boolean().default(false),
 });
 

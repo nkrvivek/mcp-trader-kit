@@ -15,6 +15,8 @@ import { RegimeGateArgs, regimeGateHandler } from "./tools/regime-gate.js";
 import { ProposeTradeArgs, proposeTradeHandler } from "./tools/propose-trade.js";
 import { TrackTaxArgs, trackTaxHandler } from "./tools/track-tax.js";
 import { TriggerCheckArgs, triggerCheckHandler } from "./tools/trigger-check.js";
+import { SignalRankArgs, signalRankHandler } from "./tools/signal-rank.js";
+import { ClassifyHoldingArgs, classifyHoldingHandler } from "./tools/classify-holding.js";
 import { redact } from "./redact.js";
 
 const TOOLS = [
@@ -47,6 +49,12 @@ const TOOLS = [
   { name: "trigger_check", description: "Check for triggered events: NAV moves, regime shifts, concentration breaches. Returns severity-sorted event list.",
     inputSchema: { type: "object", additionalProperties: false,
       properties: TriggerCheckArgs.shape as any, required: ["current_nav", "previous_nav", "current_regime_tier"] } },
+  { name: "signal_rank", description: "Rank trading signals by composite confidence. Multi-source confirmation boosts score. Deduplicates by (ticker, source).",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: SignalRankArgs.shape as any, required: ["signals"] } },
+  { name: "classify_holding", description: "Classify holdings into tiers (CORE/OPPORTUNISTIC/SPECULATIVE/PURE_SPECULATIVE) based on NAV weight, thesis, and program membership.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: ClassifyHoldingArgs.shape as any, required: ["holdings", "portfolio_total_usd"] } },
 ];
 
 const SECRETS = [
@@ -86,6 +94,8 @@ async function main() {
         case "propose_trade":  result = await proposeTradeHandler(req.params.arguments, deps); break;
         case "track_tax":      result = await trackTaxHandler(req.params.arguments); break;
         case "trigger_check":  result = await triggerCheckHandler(req.params.arguments); break;
+        case "signal_rank":    result = await signalRankHandler(req.params.arguments); break;
+        case "classify_holding": result = await classifyHoldingHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);

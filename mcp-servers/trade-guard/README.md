@@ -18,18 +18,24 @@ npm install -g traderkit
 
 ## What it does
 
-Ten MCP tools that sit between your AI assistant and your broker:
+Twelve MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
+| **Pre-trade gates** | |
 | `check_trade` | Gate a proposed trade against caps + wash-sale rules |
 | `check_wash_sale` | Standalone ±30-day wash-sale window check |
-| `scan_tlh` | Find tax-loss harvesting candidates (wash-sale-clean) |
-| `check_concentration` | Portfolio concentration analysis with HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP labels + HHI |
 | `regime_gate` | Market regime sizing gate — adjusts notional, blocks actions by tier |
+| **Portfolio analysis** | |
+| `check_concentration` | Portfolio concentration analysis with HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP labels + HHI |
+| `scan_tlh` | Find tax-loss harvesting candidates (wash-sale-clean) |
+| `classify_holding` | Classify holdings into tiers (CORE/OPPORTUNISTIC/SPECULATIVE/PURE_SPECULATIVE) |
+| `trigger_check` | Detect events: NAV moves, regime shifts, concentration breaches |
+| **Proposal + tax** | |
 | `propose_trade` | Assemble a sized trade proposal with concentration headroom and regime adjustment |
 | `track_tax` | Running STCG/LTCG tax exposure from realized trades with per-trade breakdown |
-| `trigger_check` | Detect events: NAV moves, regime shifts, concentration breaches |
+| `signal_rank` | Rank trading signals by composite confidence with multi-source boosting |
+| **Session management** | |
 | `list_profiles` | List configured trading profiles |
 | `set_profile` | Set the active profile for the session |
 
