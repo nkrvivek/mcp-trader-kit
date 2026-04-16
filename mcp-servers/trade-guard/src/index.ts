@@ -17,6 +17,11 @@ import { TrackTaxArgs, trackTaxHandler } from "./tools/track-tax.js";
 import { TriggerCheckArgs, triggerCheckHandler } from "./tools/trigger-check.js";
 import { SignalRankArgs, signalRankHandler } from "./tools/signal-rank.js";
 import { ClassifyHoldingArgs, classifyHoldingHandler } from "./tools/classify-holding.js";
+import { TradingCalendarArgs, tradingCalendarHandler } from "./tools/trading-calendar.js";
+import { PerformanceMetricsArgs, performanceMetricsHandler } from "./tools/performance-metrics.js";
+import { ThesisFitArgs, thesisFitHandler } from "./tools/thesis-fit.js";
+import { SessionWriteArgs, sessionWriteHandler } from "./tools/session-write.js";
+import { BrokerRouteArgs, brokerRouteHandler } from "./tools/broker-route.js";
 import { redact } from "./redact.js";
 
 const TOOLS = [
@@ -55,6 +60,21 @@ const TOOLS = [
   { name: "classify_holding", description: "Classify holdings into tiers (CORE/OPPORTUNISTIC/SPECULATIVE/PURE_SPECULATIVE) based on NAV weight, thesis, and program membership.",
     inputSchema: { type: "object", additionalProperties: false,
       properties: ClassifyHoldingArgs.shape as any, required: ["holdings", "portfolio_total_usd"] } },
+  { name: "trading_calendar", description: "NYSE trading calendar: check trading days, find next/prev trading day, last trading day of month, count trading days between dates.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: TradingCalendarArgs.shape as any, required: ["action", "date"] } },
+  { name: "performance_metrics", description: "Compute portfolio performance metrics: Sharpe, Sortino, max drawdown, Calmar ratio, win rate from a returns series.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: PerformanceMetricsArgs.shape as any, required: ["returns"] } },
+  { name: "thesis_fit", description: "Score how well a trade fits active theses (IN_THESIS/PARTIAL/OFF_THESIS/NO_THESIS_REF). Supports single and batch scoring.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: ThesisFitArgs.shape as any, required: ["action", "theses"] } },
+  { name: "session_write", description: "Format session document sections: executed trades table, deferred list, no-trade log, session index row.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: SessionWriteArgs.shape as any, required: ["action"] } },
+  { name: "broker_route", description: "Classify broker routing: SNAPTRADE/TRADESTATION/MANUAL/DEFERRED based on broker name and deferred tags.",
+    inputSchema: { type: "object", additionalProperties: false,
+      properties: BrokerRouteArgs.shape as any, required: ["broker", "direction"] } },
 ];
 
 const SECRETS = [
@@ -77,7 +97,7 @@ async function main() {
     }
   }
 
-  const server = new Server({ name: "trade-guard", version: "0.1.0" }, { capabilities: { tools: {} } });
+  const server = new Server({ name: "traderkit", version: "0.5.0" }, { capabilities: { tools: {} } });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const deps = { allProfiles, snaptradeRead };
@@ -96,6 +116,11 @@ async function main() {
         case "trigger_check":  result = await triggerCheckHandler(req.params.arguments); break;
         case "signal_rank":    result = await signalRankHandler(req.params.arguments); break;
         case "classify_holding": result = await classifyHoldingHandler(req.params.arguments); break;
+        case "trading_calendar": result = await tradingCalendarHandler(req.params.arguments); break;
+        case "performance_metrics": result = await performanceMetricsHandler(req.params.arguments); break;
+        case "thesis_fit":     result = await thesisFitHandler(req.params.arguments); break;
+        case "session_write":  result = await sessionWriteHandler(req.params.arguments); break;
+        case "broker_route":   result = await brokerRouteHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);

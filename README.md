@@ -1,18 +1,47 @@
 # traderkit
 
-Packaged Claude-Code-as-trading-terminal setup. Clone, run `./scripts/setup.sh`, get:
+[![npm](https://img.shields.io/npm/v/traderkit)](https://www.npmjs.com/package/traderkit)
+[![CI](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml/badge.svg)](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- **Risk-gated trade execution** — caps, forbidden tools/legs, wash-sale pre-trade check.
-- **Obsidian-style vault** for theses, trades, sessions, regime.
-- **Multi-account profiles** with `tax_entity`-scoped wash-sale pooling.
-- **Staged-proposal UX** — model shows a numbered proposal before every destructive tool, you approve in natural language.
-- Works with **SnapTrade-supported brokers** (Fidelity, E-Trade, Robinhood-read-only, IBKR, Schwab), **TradeStation**, **EXA** research, optional **Unusual Whales** and **radon** (IBKR direct).
+Risk-gate MCP server for AI-assisted trading. 17 tools that enforce caps, wash-sale rules, regime-based sizing, and portfolio analysis before any order hits your broker.
 
-## ⚠️ Disclaimer
+Built for [Claude Code](https://claude.ai/claude-code). Works with any MCP client.
 
-This software places real orders against real brokerage accounts. The authors disclaim all liability for losses, tax consequences, broker-side errors, model hallucinations, or any other outcome of its use. **Not financial advice.** You are responsible for every order approved in the REPL. Test on paper/sandbox accounts first. Do not disable the PreToolUse hook. Do not remove the risk gates.
+## Quick install
 
-## Quickstart
+```bash
+npx -y traderkit
+```
+
+## What it does
+
+```
+AI Assistant ──PreToolUse hook──► traderkit MCP (17 tools)
+                                     │
+                                     ├─ caps + wash-sale gate
+                                     ├─ regime sizing (CLEAR → HALT)
+                                     ├─ concentration analysis + HHI
+                                     ├─ proposal assembly + tax tracking
+                                     ├─ thesis fit scoring
+                                     ├─ performance metrics
+                                     │
+                                     ▼
+                               pass/block decision
+```
+
+| Category | Tools |
+|----------|-------|
+| **Pre-trade gates** | `check_trade`, `check_wash_sale`, `regime_gate` |
+| **Portfolio analysis** | `check_concentration`, `scan_tlh`, `classify_holding`, `trigger_check`, `performance_metrics` |
+| **Proposal + tax** | `propose_trade`, `track_tax`, `signal_rank`, `thesis_fit`, `broker_route` |
+| **Session management** | `list_profiles`, `set_profile`, `trading_calendar`, `session_write` |
+
+See the [npm package README](mcp-servers/trade-guard/README.md) for detailed documentation of each tool.
+
+## Full setup
+
+Clone, run setup, trade:
 
 ```bash
 git clone https://github.com/nkrvivek/traderkit
@@ -27,13 +56,79 @@ cd vault && claude
 
 See [SETUP.md](SETUP.md) for the full walkthrough.
 
-## Architecture
+### What `setup.sh` creates
 
-One MCP (`traderkit`) + one PreToolUse hook + markdown profiles + a vault template. Works with Claude Code; other MCP clients supported with a bit of wiring (see `docs/`).
+```
+~/.traderkit/
+├── .env                     # broker credentials
+├── profiles/                # trading profile YAML frontmatter
+│   ├── personal.md
+│   └── llc.md
+├── scripts/
+│   └── pre-tool-use.js      # PreToolUse hook (auto-gates trades)
+└── vault/                   # Obsidian-style trading wiki
+    ├── dashboard.md
+    ├── market-regime.md
+    ├── theses/
+    ├── sessions/
+    └── ...
+```
 
-## Tested brokers
+### Profile example
 
-See [docs/brokerages.md](docs/brokerages.md). TL;DR: SnapTrade covers Fidelity/E-Trade/IBKR/Schwab read+write, Robinhood read-only. TradeStation via its own MCP. Ally/Morgan Stanley manual.
+```yaml
+---
+name: personal
+broker: snaptrade
+account_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+tax_entity: personal
+caps:
+  max_order_notional: 10000
+  max_single_name_pct: 25
+  forbidden_tools: []
+  forbidden_leg_shapes: [naked_put, naked_call]
+---
+```
+
+### PreToolUse hook
+
+The hook calls `check_trade` + `regime_gate` automatically before any destructive broker tool fires. Add to `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__snaptrade-trade__equity_force_place|mcp__snaptrade-trade__mleg_place",
+        "command": "node ~/.traderkit/scripts/pre-tool-use.js"
+      }
+    ]
+  }
+}
+```
+
+## Key design decisions
+
+- **Fail-closed by default.** If traderkit can't evaluate a trade, it blocks.
+- **Read-only risk gate.** Traderkit checks and sizes — it never places orders. Order execution stays with the broker MCP (SnapTrade, TradeStation).
+- **Credential redaction.** All tool responses are scrubbed — any env secret substring (8+ chars) is replaced with `<REDACTED>`.
+- **Tax-entity pooling.** Wash-sale checks span all accounts with the same `tax_entity`. Personal brokerage + IRA = one pool. LLC = separate pool.
+
+## Supported brokers
+
+Works with any broker connected via [SnapTrade](https://snaptrade.com/):
+
+- Fidelity (read + write)
+- E-Trade (read + write)
+- IBKR (read + write)
+- Schwab (read + write)
+- Robinhood (read-only)
+- TradeStation (via separate [TradeStation MCP](https://github.com/anthropics/anthropic-cookbook/tree/main/misc/tradestation_mcp))
+- Ally, Morgan Stanley — manual execution only
+
+## Disclaimer
+
+This software places real orders against real brokerage accounts. The authors disclaim all liability for losses, tax consequences, broker-side errors, model hallucinations, or any other outcome of its use. **Not financial advice.** You are responsible for every order approved in the REPL. Test on paper/sandbox accounts first. Do not disable the PreToolUse hook. Do not remove the risk gates.
 
 ## License
 

@@ -18,7 +18,7 @@ npm install -g traderkit
 
 ## What it does
 
-Twelve MCP tools that sit between your AI assistant and your broker:
+Seventeen MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
@@ -31,13 +31,18 @@ Twelve MCP tools that sit between your AI assistant and your broker:
 | `scan_tlh` | Find tax-loss harvesting candidates (wash-sale-clean) |
 | `classify_holding` | Classify holdings into tiers (CORE/OPPORTUNISTIC/SPECULATIVE/PURE_SPECULATIVE) |
 | `trigger_check` | Detect events: NAV moves, regime shifts, concentration breaches |
+| `performance_metrics` | Sharpe, Sortino, max drawdown, Calmar ratio, win rate from returns series |
 | **Proposal + tax** | |
 | `propose_trade` | Assemble a sized trade proposal with concentration headroom and regime adjustment |
 | `track_tax` | Running STCG/LTCG tax exposure from realized trades with per-trade breakdown |
 | `signal_rank` | Rank trading signals by composite confidence with multi-source boosting |
+| `thesis_fit` | Score trade alignment to active theses (IN_THESIS/PARTIAL/OFF_THESIS/NO_THESIS_REF) |
+| `broker_route` | Classify broker routing: SNAPTRADE/TRADESTATION/MANUAL/DEFERRED |
 | **Session management** | |
 | `list_profiles` | List configured trading profiles |
 | `set_profile` | Set the active profile for the session |
+| `trading_calendar` | NYSE trading calendar: trading day checks, next/prev, last-of-month, count between |
+| `session_write` | Format session doc sections: executed table, deferred list, no-trade log, index row |
 
 ### `check_trade`
 
@@ -119,6 +124,56 @@ Event detector for portfolio monitoring. Checks three conditions:
 
 Returns events sorted by severity (CRITICAL → WARNING → INFO).
 
+### `performance_metrics`
+
+Computes portfolio performance metrics from a daily returns series:
+
+- **Sharpe ratio** — risk-adjusted return (sample variance, annualized)
+- **Sortino ratio** — downside-only volatility version
+- **Max drawdown** — largest peak-to-trough decline (fraction 0–1), with peak/trough indices
+- **Calmar ratio** — annualized return / max drawdown
+- **Win rate** — fraction of positive returns, plus average win and average loss
+
+Requires minimum 20 observations by default (configurable via `min_observations`). Supports custom `risk_free_rate` (default 5%) and `periods_per_year` (default 252).
+
+### `thesis_fit`
+
+Scores how well a trade aligns with active theses:
+
+- **IN_THESIS** — ticker + structure match an active thesis
+- **PARTIAL** — ticker matches but structure doesn't
+- **OFF_THESIS** — ticker not in thesis, or thesis is closed
+- **NO_THESIS_REF** — no `thesis_ref` provided
+
+Supports `score_fit` (single) and `batch_score` (portfolio-wide). Batch returns a summary with counts per score tier.
+
+### `trading_calendar`
+
+NYSE trading calendar with 10 observed holidays + Good Friday. Five actions:
+
+- `is_trading_day` — check if a date is a trading day
+- `next_trading_day` / `prev_trading_day` — find adjacent trading days
+- `last_trading_day_of_month` — useful for monthly rolls and reviews
+- `trading_days_between` — count trading days in a range
+
+### `session_write`
+
+Formats session document sections as markdown. Four actions:
+
+- `format_executed` — markdown table of executed trades
+- `format_deferred` — bullet list with deferred tags
+- `format_no_trade` — bullet list of rejected tickers with reasons
+- `format_session_index_row` — 11-column index table row for session tracking
+
+### `broker_route`
+
+Classifies broker routing for order dispatch:
+
+- **SNAPTRADE** — Fidelity, E-Trade, Robinhood, Schwab, IBKR
+- **TRADESTATION** — TradeStation
+- **MANUAL** — Ally, Morgan Stanley, unknown brokers
+- **DEFERRED** — any trade with deferred tags (overrides broker classification)
+
 ## Setup
 
 ### 1. Create profiles
@@ -148,7 +203,7 @@ Add to `.claude/settings.json`:
 ```json
 {
   "mcpServers": {
-    "trade-guard": { "command": "npx", "args": ["-y", "traderkit"] }
+    "traderkit": { "command": "npx", "args": ["-y", "traderkit"] }
   }
 }
 ```
@@ -184,12 +239,12 @@ In Claude Code: ask "list profiles" to confirm the server is connected.
 |----------|----------|-------------|
 | `TRADERKIT_ROOT` | No | Config root (default: `~/.traderkit`) |
 | `TRADERKIT_FAIL_OPEN` | No | Set `true` to allow trades when server is unreachable (default: fail closed) |
-| `SNAPTRADE_CONSUMER_KEY` | For wash-sale | SnapTrade credentials for activity lookups |
-| `SNAPTRADE_USER_SECRET` | For wash-sale | |
-| `SNAPTRADE_USER_ID` | For wash-sale | |
-| `SNAPTRADE_CLIENT_ID` | For wash-sale | |
-| `SNAPTRADE_READ_COMMAND` | For wash-sale | Command to spawn snaptrade-mcp-ts (e.g., `npx`) |
-| `SNAPTRADE_READ_ARGS` | For wash-sale | Args for the command (e.g., `-y snaptrade-mcp-ts`) |
+| `SNAPTRADE_CONSUMER_KEY` | For wash-sale + TLH | SnapTrade credentials for activity lookups |
+| `SNAPTRADE_USER_SECRET` | For wash-sale + TLH | |
+| `SNAPTRADE_USER_ID` | For wash-sale + TLH | |
+| `SNAPTRADE_CLIENT_ID` | For wash-sale + TLH | |
+| `SNAPTRADE_READ_COMMAND` | For wash-sale + TLH | Command to spawn snaptrade-mcp-ts (e.g., `npx`) |
+| `SNAPTRADE_READ_ARGS` | For wash-sale + TLH | Args for the command (e.g., `-y snaptrade-mcp-ts`) |
 
 ## How it works
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0] — 2026-04-16
+
+### traderkit
+- New tools: `trading_calendar`, `performance_metrics`, `thesis_fit`, `session_write`, `broker_route`.
+- `trading_calendar`: NYSE calendar with 10 holidays + Good Friday, 5 actions (is_trading_day, next/prev, last-of-month, count-between).
+- `performance_metrics`: Sharpe, Sortino, max drawdown, Calmar ratio, win rate from daily returns series.
+- `thesis_fit`: IN_THESIS/PARTIAL/OFF_THESIS/NO_THESIS_REF scoring with single + batch modes.
+- `session_write`: markdown formatters for session docs (executed table, deferred list, no-trade log, index row).
+- `broker_route`: SNAPTRADE/TRADESTATION/MANUAL/DEFERRED routing classification.
+- Server version updated to 0.5.0, name to `traderkit`.
+- README: updated tool count to 17, added documentation for all new tools.
+- README: fixed SnapTrade env vars to show "For wash-sale + TLH" (was "For wash-sale").
+- 135 tests passing.
+
 ## [0.4.0] — 2026-04-16
 
 ### traderkit
