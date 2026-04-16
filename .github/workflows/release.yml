@@ -1,15 +1,17 @@
-name: Release trade-guard-mcp
+name: Release traderkit-guard
 on:
   push:
-    tags: ["trade-guard-v*"]
+    tags: ["guard-v*"]
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, registry-url: "https://registry.npmjs.org" }
+        with: { node-version: 22, registry-url: "https://registry.npmjs.org" }
       - run: npm ci
-      - run: npm run -w trade-guard-mcp build
-      - run: npm publish -w trade-guard-mcp --access public
+      - run: npm run -w traderkit-guard build
+      - run: npm publish -w traderkit-guard --access public
         env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
