@@ -44,6 +44,14 @@
     "yaml": "^2.5.0",
     "zod": "^4.0.0"
   },
+  "peerDependencies": {
+    "snaptrade-mcp-ts": "^0.1.0",
+    "snaptrade-trade-mcp": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "snaptrade-mcp-ts": { "optional": false },
+    "snaptrade-trade-mcp": { "optional": false }
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^3.2.4",

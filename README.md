@@ -10,9 +10,19 @@ Built for [Claude Code](https://claude.ai/claude-code). Works with any MCP clien
 
 ## Quick install
 
+**Zero-env**:
 ```bash
-npx -y traderkit
+curl -fsSL https://raw.githubusercontent.com/nkrvivek/traderkit/main/scripts/bootstrap.sh | bash
 ```
+
+**Manual** (Node 20+ + Claude Code CLI already installed):
+```bash
+npx -y traderkit                    # risk gate MCP (this repo)
+npx -y snaptrade-mcp-ts             # portfolio reads
+npx -y snaptrade-trade-mcp          # trade execution
+```
+
+All three packages are required for interactive mode. `traderkit` declares the other two as peerDependencies.
 
 ## What it does
 

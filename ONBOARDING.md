@@ -49,12 +49,22 @@ A step-by-step to go from zero to `/trade main --mode dry-run` running against a
 
 ## Step 3: Install traderkit
 
+**Zero-env one-liner** (installs Xcode CLT, Homebrew, Node 20, Claude CLI, then runs setup — idempotent, safe to re-run):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nkrvivek/traderkit/main/scripts/bootstrap.sh | bash
+```
+
+Or if Node 20 + Claude CLI are already installed:
+
 ```bash
 git clone https://github.com/nkrvivek/traderkit
 cd traderkit
 npm install
 ./scripts/setup.sh
 ```
+
+This installs three MCP servers from npm (`traderkit`, `snaptrade-mcp-ts`, `snaptrade-trade-mcp`) — no local builds required.
 
 The setup wizard prompts for a **vault path** (where session docs + notes live). Pick any directory — `~/trading-vault` works. It will:
 
