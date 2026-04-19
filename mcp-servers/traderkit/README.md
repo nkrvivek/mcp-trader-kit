@@ -18,7 +18,7 @@ npm install -g traderkit
 
 ## What it does
 
-Seventeen MCP tools that sit between your AI assistant and your broker:
+Twenty-three MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
@@ -32,6 +32,14 @@ Seventeen MCP tools that sit between your AI assistant and your broker:
 | `classify_holding` | Classify holdings into tiers (CORE/OPPORTUNISTIC/SPECULATIVE/PURE_SPECULATIVE) |
 | `trigger_check` | Detect events: NAV moves, regime shifts, concentration breaches |
 | `performance_metrics` | Sharpe, Sortino, max drawdown, Calmar ratio, win rate from returns series |
+| **Options research** | |
+| `screen_options` | Screen CSP/CC/PCS/CCS candidates by IV rank, delta, DTE, credit, YoR, OI, earnings |
+| `calc_roll` | Credit-first roll-finder for short options; ranks by (net_credit / DTE_ext) × new_POP |
+| `calc_max_pain` | Max Pain strike + OI walls; returns pain curve + P/C ratio + pin-drift notes |
+| **Fundamentals + smart-money** | |
+| `fmp_fundamentals` | Per-ticker quote, DCF, analyst targets, next earnings (via FMP free tier) |
+| `inst_holdings` | 13F institutional holdings (by_ticker / by_fund / list_funds) — curated CIK map for Citadel, BlackRock, Berkshire, Pershing, etc. |
+| `track_activists` | SEC EDGAR activist filings tracker (13D/13D/A/13G/DEF 14A); curated activist CIKs (Icahn, Elliott, Starboard, Pershing, Loeb, Peltz, ValueAct) |
 | **Proposal + tax** | |
 | `propose_trade` | Assemble a sized trade proposal with concentration headroom and regime adjustment |
 | `track_tax` | Running STCG/LTCG tax exposure from realized trades with per-trade breakdown |
@@ -245,6 +253,10 @@ In Claude Code: ask "list profiles" to confirm the server is connected.
 | `SNAPTRADE_CLIENT_ID` | For SnapTrade | |
 | `SNAPTRADE_READ_COMMAND` | For SnapTrade | Command to spawn snaptrade-mcp-ts (e.g., `npx`) |
 | `SNAPTRADE_READ_ARGS` | For SnapTrade | Args for the command (e.g., `-y snaptrade-mcp-ts`) |
+| `FMP_API_KEY` | For fundamentals | Financial Modeling Prep API key (free tier: 250 calls/day) — used by `fmp_fundamentals`, `screen_options`, `inst_holdings` |
+| `UW_API_KEY` | For options | Unusual Whales API key — used by `screen_options`, `calc_max_pain` |
+| `FINNHUB_API_KEY` | For options | Finnhub API key — used by `screen_options` (earnings calendar) |
+| `SEC_USER_AGENT` | No | SEC EDGAR User-Agent override (defaults to `traderkit-mcp research (contact: <email>)`) — SEC fair-use requires contact email |
 
 ## How it works
 

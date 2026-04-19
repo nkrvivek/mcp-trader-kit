@@ -6,7 +6,7 @@ import { TickerSchema } from "../utils/schemas.js";
 // Hand-curated CIK map for marquee institutional managers. 10-digit zero-padded.
 export const KNOWN_FUNDS: Record<string, { cik: string; full_name: string; tags: string[] }> = {
   citadel:       { cik: "0001423053", full_name: "Citadel Advisors LLC",            tags: ["hedge-fund", "multi-strat"] },
-  blackrock:     { cik: "0001364742", full_name: "BlackRock Inc.",                  tags: ["asset-manager", "index"] },
+  blackrock:     { cik: "0001086364", full_name: "BlackRock Advisors LLC",          tags: ["asset-manager", "index"] },
   vanguard:      { cik: "0000102909", full_name: "Vanguard Group Inc.",             tags: ["asset-manager", "index"] },
   statestreet:   { cik: "0000093751", full_name: "State Street Corp",               tags: ["asset-manager", "index"] },
   berkshire:     { cik: "0001067983", full_name: "Berkshire Hathaway Inc.",         tags: ["value", "buffett"] },
@@ -25,7 +25,6 @@ export const KNOWN_FUNDS: Record<string, { cik: string; full_name: string; tags:
   viking:        { cik: "0001103804", full_name: "Viking Global Investors LP",      tags: ["hedge-fund", "long-short"] },
   coatue:        { cik: "0001135730", full_name: "Coatue Management LLC",           tags: ["hedge-fund", "tech"] },
   dfa:           { cik: "0000354204", full_name: "Dimensional Fund Advisors LP",    tags: ["asset-manager", "factor"] },
-  jpmorgan:      { cik: "0001071992", full_name: "JPMorgan Chase & Co",             tags: ["bank", "asset-manager"] },
   goldman:       { cik: "0000886982", full_name: "Goldman Sachs Group Inc.",        tags: ["bank", "asset-manager"] },
   morgan_stanley:{ cik: "0000895421", full_name: "Morgan Stanley",                  tags: ["bank", "asset-manager"] },
 };
@@ -34,7 +33,7 @@ export const InstHoldingsArgs = z.object({
   mode: z.enum(["by_ticker", "by_fund", "list_funds"]),
   ticker: TickerSchema.optional(),
   fund: z.string().optional(),
-  cik: z.string().regex(/^\d{1,10}$/).optional(),
+  cik: z.string().regex(/^\d{1,10}$/, "CIK must be 1-10 digits; caller or server pads to 10").optional(),
   top: z.number().int().positive().max(50).default(20),
 });
 

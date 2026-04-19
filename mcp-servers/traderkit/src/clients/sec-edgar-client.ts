@@ -5,6 +5,9 @@ import { toMessage } from "../utils/errors.js";
 
 const SEC_UA = process.env.SEC_USER_AGENT ?? "traderkit-mcp research (contact: nkrvivek@gmail.com)";
 
+// SEC fair-use: individual response size cap to prevent memory blow-ups on very large 13F XML.
+const SEC_MAX_RESPONSE_BYTES = 25 * 1024 * 1024; // 25 MB
+
 export interface Sec13FHolding {
   ticker: string;
   cusip: string;
@@ -19,6 +22,10 @@ export interface Sec13FHolding {
 async function secGet(url: string, accept = "application/json"): Promise<Response> {
   const res = await fetch(url, { headers: { "User-Agent": SEC_UA, Accept: accept } });
   if (!res.ok) throw new Error(`SEC ${res.status} ${url.split("/").slice(-2).join("/")}`);
+  const len = Number(res.headers.get("content-length") ?? "0");
+  if (len > SEC_MAX_RESPONSE_BYTES) {
+    throw new Error(`SEC response too large (${len} bytes > ${SEC_MAX_RESPONSE_BYTES} cap) for ${url.split("/").slice(-2).join("/")}`);
+  }
   return res;
 }
 
@@ -149,7 +156,7 @@ export interface SecFilingSearchOpts {
 
 export async function secSearchFilings(opts: SecFilingSearchOpts): Promise<SecActivistFiling[]> {
   const params = new URLSearchParams({
-    q: opts.query ?? `"${opts.forms[0]}"`,
+    q: opts.query ?? `"${opts.forms[0]!}"`,
     forms: opts.forms.join(","),
     dateRange: "custom",
     startdt: opts.start_date,

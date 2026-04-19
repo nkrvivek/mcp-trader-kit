@@ -4,31 +4,26 @@ import { KNOWN_FUNDS } from "./inst-holdings.js";
 import { TickerSchema } from "../utils/schemas.js";
 
 // Known activist/event-driven funds — extension of KNOWN_FUNDS w/ activist-specific CIKs.
+// Verified via SEC submissions API 2026-04-19. Entries removed where CIK resolved
+// to a wrong/unrelated entity (hindenburg, cevian, engine_no1, jana, blueharbour,
+// standard_general, corvex). `ackman` removed as duplicate of `pershing`.
 export const KNOWN_ACTIVISTS: Record<string, { cik: string; full_name: string; style: string }> = {
   pershing:     { cik: "0001336528", full_name: "Pershing Square Capital Mgmt (Ackman)",  style: "concentrated-activist" },
   icahn:        { cik: "0000921669", full_name: "Icahn Capital LP (Carl Icahn)",          style: "hard-activist" },
-  elliott:      { cik: "0001791786", full_name: "Elliott Investment Management LP",        style: "constructivist" },
-  starboard:    { cik: "0001517137", full_name: "Starboard Value LP",                      style: "hard-activist" },
-  third_point:  { cik: "0001040273", full_name: "Third Point LLC (Loeb)",                  style: "event-driven" },
-  engine_no1:   { cik: "0001812044", full_name: "Engine No. 1 LLC",                        style: "esg-activist" },
-  trian:        { cik: "0001345471", full_name: "Trian Fund Management LP (Peltz)",        style: "operational-activist" },
-  valueact:     { cik: "0001418814", full_name: "ValueAct Capital Management",             style: "collaborative-activist" },
-  jana:         { cik: "0001305337", full_name: "JANA Partners LLC",                       style: "event-driven" },
-  hindenburg:   { cik: "0001873859", full_name: "Hindenburg Research LLC",                 style: "short-activist" },
-  cevian:       { cik: "0001329377", full_name: "Cevian Capital",                          style: "constructivist" },
-  blueharbour:  { cik: "0001404574", full_name: "Blue Harbour Group",                      style: "constructivist" },
-  standard_general:{ cik: "0001391781", full_name: "Standard General LP",                  style: "event-driven" },
-  corvex:       { cik: "0001567094", full_name: "Corvex Management LP (Meister)",          style: "event-driven" },
-  ackman:       { cik: "0001336528", full_name: "Pershing Square Capital Mgmt (Ackman)",   style: "concentrated-activist" },
+  elliott:      { cik: "0001791786", full_name: "Elliott Investment Management LP",       style: "constructivist" },
+  starboard:    { cik: "0001517137", full_name: "Starboard Value LP",                     style: "hard-activist" },
+  third_point:  { cik: "0001040273", full_name: "Third Point LLC (Loeb)",                 style: "event-driven" },
+  trian:        { cik: "0001345471", full_name: "Trian Fund Management LP (Peltz)",       style: "operational-activist" },
+  valueact:     { cik: "0001418814", full_name: "ValueAct Holdings LP",                   style: "collaborative-activist" },
 };
 
 export const TrackActivistsArgs = z.object({
   mode: z.enum(["by_ticker", "by_fund", "recent", "list_activists"]),
   ticker: TickerSchema.optional(),
   fund: z.string().optional(),
-  cik: z.string().regex(/^\d{1,10}$/).optional(),
+  cik: z.string().regex(/^\d{1,10}$/, "CIK must be 1-10 digits; server pads to 10").optional(),
   days_back: z.number().int().positive().max(1095).default(90),
-  forms: z.array(z.enum(["SC 13D", "SC 13D/A", "SC 13G", "SC 13G/A", "DEF 14A", "PREC14A"])).default(["SC 13D", "SC 13D/A"]),
+  forms: z.array(z.enum(["SC 13D", "SC 13D/A", "SC 13G", "SC 13G/A", "DEF 14A", "PREC14A"])).nonempty().default(["SC 13D", "SC 13D/A"]),
   top: z.number().int().positive().max(100).default(25),
 });
 
@@ -69,7 +64,7 @@ async function compute(args: Args): Promise<Result | ListResult> {
   const end_date = new Date().toISOString().slice(0, 10);
   const start_date = isoDaysAgo(args.days_back);
 
-  let query = `"${args.forms[0]}"`;
+  let query = `"${args.forms[0]!}"`;
   if (args.mode === "by_ticker") {
     if (!args.ticker) throw new Error("ticker required for mode=by_ticker");
     query = args.ticker.toUpperCase();

@@ -4,7 +4,7 @@
 [![CI](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml/badge.svg)](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Risk-gate MCP server for AI-assisted trading. 19 tools that enforce caps, wash-sale rules, regime-based sizing, and portfolio analysis before any order hits your broker.
+Risk-gate MCP server for AI-assisted trading. 23 tools that enforce caps, wash-sale rules, regime-based sizing, and portfolio analysis — plus options screening, 13F smart-money tracking, and activist-filing surveillance — before any order hits your broker.
 
 Built for [Claude Code](https://claude.ai/claude-code). Works with any MCP client.
 
@@ -17,7 +17,7 @@ npx -y traderkit
 ## What it does
 
 ```
-AI Assistant ──PreToolUse hook──► traderkit MCP (19 tools)
+AI Assistant ──PreToolUse hook──► traderkit MCP (23 tools)
                                      │
                                      ├─ caps + wash-sale gate
                                      ├─ regime sizing (CLEAR → HALT)
@@ -34,7 +34,8 @@ AI Assistant ──PreToolUse hook──► traderkit MCP (19 tools)
 |----------|-------|
 | **Pre-trade gates** | `check_trade`, `check_wash_sale`, `regime_gate` |
 | **Portfolio analysis** | `check_concentration`, `scan_tlh`, `classify_holding`, `trigger_check`, `performance_metrics` |
-| **Options screening + rolls** | `screen_options`, `calc_roll` |
+| **Options screening + rolls** | `screen_options`, `calc_roll`, `calc_max_pain` |
+| **Fundamentals + smart-money** | `fmp_fundamentals`, `inst_holdings`, `track_activists` |
 | **Proposal + tax** | `propose_trade`, `track_tax`, `signal_rank`, `thesis_fit`, `broker_route` |
 | **Session management** | `list_profiles`, `set_profile`, `trading_calendar`, `session_write` |
 
