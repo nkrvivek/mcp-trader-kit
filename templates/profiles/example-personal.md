@@ -11,4 +11,4 @@ caps:
 ---
 
 # example-personal profile
-Individual taxable brokerage account. Replace `account_id` with the UUID from `snaptrade_list_accounts`.
+Individual taxable brokerage account. Replace `account_id` with the UUID from `list_accounts`.

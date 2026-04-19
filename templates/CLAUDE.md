@@ -43,9 +43,9 @@ Do not ask "want me to persist this?" — just do it.
 ## 5. Data freshness
 If any dashboard figure is >4h stale OR user asks for "refresh":
 ```
-snaptrade_check_status
-snaptrade_list_accounts
-snaptrade_portfolio_summary
+check_status
+list_accounts
+get_holdings
 ```
 Then update `portfolio-master.md` + `dashboard.md`.
 

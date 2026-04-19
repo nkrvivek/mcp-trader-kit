@@ -32,11 +32,8 @@ if [[ -x "$KIT_ROOT/scripts/pre-tool-use.js" ]]; then pass "hook-script" "execut
 # traderkit binary
 if command -v traderkit >/dev/null 2>&1; then pass "traderkit" "$(which traderkit)"; else skip "traderkit" "not globally installed (npx -y will resolve)"; fi
 
-# snaptrade-trade-mcp
-if command -v snaptrade-trade-mcp >/dev/null 2>&1; then pass "snaptrade-trade-mcp" "installed"; else skip "snaptrade-trade-mcp" "not globally installed"; fi
-
-# snaptrade-mcp-ts
-if command -v snaptrade-mcp-ts >/dev/null 2>&1; then pass "snaptrade-mcp-ts" "installed"; else skip "snaptrade-mcp-ts" "not globally installed"; fi
+# snaptrade-trade-mcp (covers reads + trading since 0.2.0)
+if command -v snaptrade-trade-mcp >/dev/null 2>&1; then pass "snaptrade-trade-mcp" "installed"; else skip "snaptrade-trade-mcp" "not globally installed (npx -y fallback works)"; fi
 
 # creds
 if [[ -f "$KIT_ROOT/.env" ]] && grep -q '^SNAPTRADE_CONSUMER_KEY=..*$' "$KIT_ROOT/.env"; then

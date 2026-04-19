@@ -47,7 +47,7 @@ UW_TOKEN=...        # optional
 
 ## Step 4: Profiles
 
-Edit `~/.traderkit/profiles/example-personal.md` (rename to e.g. `personal.md`). Replace `account_id` with the UUID from a `snaptrade_list_accounts` call. Set realistic caps.
+Edit `~/.traderkit/profiles/example-personal.md` (rename to e.g. `personal.md`). Replace `account_id` with the UUID from a `list_accounts` call. Set realistic caps.
 
 Repeat for each account. Pool wash-sale scope via `tax_entity`: all personal accounts get `personal`; each LLC gets its own `llc-*`.
 
@@ -75,5 +75,5 @@ Try: "list positions in `<profile>`", then a small proposal. Verify the hook fir
 ## Troubleshooting
 
 - **Hook never fires:** check `.claude/settings.json` matcher pattern — tool names must start with `mcp__<server-name>__<tool-name>`.
-- **Wash-sale check always returns unavailable:** confirm `SNAPTRADE_READ_COMMAND=npx SNAPTRADE_READ_ARGS="-y snaptrade-mcp-ts"` is in the env when traderkit launches (Claude Code inherits the project env).
+- **Wash-sale check always returns unavailable:** confirm `SNAPTRADE_READ_COMMAND=npx SNAPTRADE_READ_ARGS="-y snaptrade-trade-mcp"` is in the env when traderkit launches (Claude Code inherits the project env).
 - **Profile not found:** `traderkit.list_profiles` should show the file name (without `.md`) — if empty, verify YAML frontmatter parses and `TRADERKIT_ROOT` points where you think.

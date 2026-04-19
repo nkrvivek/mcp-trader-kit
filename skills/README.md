@@ -39,7 +39,7 @@ Each phase file (`trade/phases/0X-*.md`) is independently readable. Edit in plac
 ## Required MCP servers
 
 - `traderkit` (this repo)
-- `snaptrade-mcp-ts` (portfolio reads)
+- `snaptrade-trade-mcp` (portfolio reads)
 - `snaptrade-trade-mcp` (execution, interactive mode only)
 
 Optional:

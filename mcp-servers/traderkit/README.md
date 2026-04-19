@@ -66,7 +66,7 @@ Returns `{ pass: boolean, reasons: string[], warnings: string[] }`.
 
 ### `check_wash_sale`
 
-Standalone wash-sale check. Pulls last 30 days of activity from a sibling [snaptrade-mcp-ts](https://www.npmjs.com/package/snaptrade-mcp-ts) server. Pools all accounts under the same `tax_entity` (e.g., all personal accounts share one wash-sale window; an LLC has its own).
+Standalone wash-sale check. Pulls last 30 days of activity from a sibling [snaptrade-trade-mcp](https://www.npmjs.com/package/snaptrade-trade-mcp) server. Pools all accounts under the same `tax_entity` (e.g., all personal accounts share one wash-sale window; an LLC has its own).
 
 Graceful degradation: if snaptrade-read is unavailable, returns `flagged: false` with a warning rather than blocking.
 
@@ -74,7 +74,7 @@ Graceful degradation: if snaptrade-read is unavailable, returns `flagged: false`
 
 Scans your positions for tax-loss harvesting opportunities. Filters to positions with unrealized loss above a threshold (default $500), then excludes any that would trigger a wash sale. Returns candidates sorted by loss size (largest first).
 
-Requires positions data as input (from `snaptrade_get_positions` or equivalent).
+Requires positions data as input (from `get_positions` or equivalent).
 
 ### `check_concentration`
 
@@ -202,7 +202,7 @@ caps:
 ---
 ```
 
-Get your `account_id` from `snaptrade_list_accounts`.
+Get your `account_id` from `list_accounts`.
 
 ### 2. Register in Claude Code
 
@@ -247,12 +247,12 @@ In Claude Code: ask "list profiles" to confirm the server is connected.
 |----------|----------|-------------|
 | `TRADERKIT_ROOT` | No | Config root (default: `~/.traderkit`) |
 | `TRADERKIT_FAIL_OPEN` | No | Set `true` to allow trades when server is unreachable (default: fail closed) |
-| `SNAPTRADE_CONSUMER_KEY` | For SnapTrade | SnapTrade credentials — used here for activity lookups (wash-sale, TLH) and by companion [snaptrade-mcp-ts](https://www.npmjs.com/package/snaptrade-mcp-ts) for trade execution |
+| `SNAPTRADE_CONSUMER_KEY` | For SnapTrade | SnapTrade credentials — used here for activity lookups (wash-sale, TLH) and by companion [snaptrade-trade-mcp](https://www.npmjs.com/package/snaptrade-trade-mcp) for trade execution |
 | `SNAPTRADE_USER_SECRET` | For SnapTrade | |
 | `SNAPTRADE_USER_ID` | For SnapTrade | |
 | `SNAPTRADE_CLIENT_ID` | For SnapTrade | |
-| `SNAPTRADE_READ_COMMAND` | For SnapTrade | Command to spawn snaptrade-mcp-ts (e.g., `npx`) |
-| `SNAPTRADE_READ_ARGS` | For SnapTrade | Args for the command (e.g., `-y snaptrade-mcp-ts`) |
+| `SNAPTRADE_READ_COMMAND` | For SnapTrade | Command to spawn snaptrade-trade-mcp (e.g., `npx`) |
+| `SNAPTRADE_READ_ARGS` | For SnapTrade | Args for the command (e.g., `-y snaptrade-trade-mcp`) |
 | `FMP_API_KEY` | For fundamentals | Financial Modeling Prep API key (free tier: 250 calls/day) — used by `fmp_fundamentals`, `screen_options`, `inst_holdings` |
 | `UW_API_KEY` | For options | Unusual Whales API key — used by `screen_options`, `calc_max_pain` |
 | `FINNHUB_API_KEY` | For options | Finnhub API key — used by `screen_options` (earnings calendar) |
@@ -264,7 +264,7 @@ In Claude Code: ask "list profiles" to confirm the server is connected.
 Claude Code ──PreToolUse hook──► traderkit MCP
                                     │
                                     ├─ caps check (profile YAML)
-                                    ├─ wash-sale check (snaptrade-mcp-ts)
+                                    ├─ wash-sale check (snaptrade-trade-mcp)
                                     │
                                     ▼
                               pass/block decision

@@ -5,7 +5,7 @@ User: switch to bildof
 Claude: active profile set to bildof (LLC partnership, $5k notional cap, no naked options).
 
 User: current bildof positions
-Claude: [calls snaptrade_get_positions] ... summarizes.
+Claude: [calls get_positions] ... summarizes.
 
 User: sell an AAPL 2026-06 $200 covered call against the 100 shares
 Claude:

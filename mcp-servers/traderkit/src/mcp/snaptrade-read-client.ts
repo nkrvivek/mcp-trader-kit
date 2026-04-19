@@ -40,8 +40,11 @@ export async function connectSnaptradeRead(deps: ClientDeps): Promise<SnaptradeR
       const cached = cache.get(key);
       if (cached) return cached;
       const result = await client.callTool({
-        name: "snaptrade_get_activities",
-        arguments: { account_ids: accountIds, start_date: since.toISOString().slice(0, 10) },
+        name: "get_activities",
+        arguments: {
+          accounts: accountIds.join(","),
+          start_date: since.toISOString().slice(0, 10),
+        },
       });
       const rows = extractActivities(result);
       cache.set(key, rows);

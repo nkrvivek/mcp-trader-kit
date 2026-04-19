@@ -39,7 +39,7 @@ Phase 5: PERSIST    session doc write (vault optional)
 ## Required MCP servers
 
 - **traderkit** (this repo) — 23 risk + sizing tools
-- **snaptrade-mcp-ts** — portfolio reads (Fidelity, Robinhood, E-Trade, IBKR, Schwab)
+- **snaptrade-trade-mcp** — portfolio reads (Fidelity, Robinhood, E-Trade, IBKR, Schwab)
 - **snaptrade-trade-mcp** — broker execution (optional, only for `--mode interactive`)
 
 Optional:

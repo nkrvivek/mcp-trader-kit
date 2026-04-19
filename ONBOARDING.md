@@ -137,7 +137,7 @@ bash ./scripts/doctor.sh
 
 This verifies:
 - `.env` loads
-- SnapTrade credentials work (runs `snaptrade_check_status`)
+- SnapTrade credentials work (runs `check_status`)
 - traderkit MCP tools register
 - Skills are symlinked correctly
 

@@ -6,7 +6,7 @@
 cat <<'EOF'
 Refresh the portfolio via the standard chain:
 
-1. Call snaptrade_check_status, snaptrade_list_accounts, snaptrade_portfolio_summary.
+1. Call check_status, list_accounts, get_holdings.
 2. For each brokerage, update wiki/trading/<broker>-portfolio.md.
 3. Aggregate into wiki/trading/portfolio-master.md.
 4. Update totals + "last refresh" timestamp in wiki/trading/dashboard.md.

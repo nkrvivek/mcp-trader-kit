@@ -41,10 +41,10 @@ describe("traderkit stdio integration", () => {
     if (client) await client.close();
   });
 
-  it("lists 19 tools", async () => {
+  it("lists all tools", async () => {
     const r = await client!.listTools();
     const names = r.tools.map((t) => t.name).sort();
-    expect(names).toEqual(["broker_route", "calc_roll", "check_concentration", "check_trade", "check_wash_sale", "classify_holding", "list_profiles", "performance_metrics", "propose_trade", "regime_gate", "scan_tlh", "screen_options", "session_write", "set_profile", "signal_rank", "thesis_fit", "track_tax", "trading_calendar", "trigger_check"]);
+    expect(names).toEqual(["broker_route", "calc_max_pain", "calc_roll", "check_concentration", "check_trade", "check_wash_sale", "classify_holding", "fmp_fundamentals", "inst_holdings", "list_profiles", "performance_metrics", "propose_trade", "regime_gate", "scan_tlh", "screen_options", "session_write", "set_profile", "signal_rank", "thesis_fit", "track_activists", "track_tax", "trading_calendar", "trigger_check"]);
   });
 
   it("list_profiles returns the seeded profile", async () => {

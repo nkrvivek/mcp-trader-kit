@@ -82,7 +82,7 @@ npm install -g traderkit snaptrade-trade-mcp 2>/dev/null || \
 say "Next steps"
 cat <<EOF
 1. Edit $KIT_ROOT/.env with your credentials.
-2. Edit $KIT_ROOT/profiles/*.md — replace placeholder account_ids with UUIDs from snaptrade_list_accounts.
+2. Edit $KIT_ROOT/profiles/*.md — replace placeholder account_ids with UUIDs from list_accounts.
 3. Run: bash $REPO_ROOT/scripts/doctor.sh
 4. cd $VAULT_PATH && claude
 EOF

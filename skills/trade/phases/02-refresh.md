@@ -8,10 +8,10 @@
 Run in parallel:
 
 ```
-mcp__snaptrade__snaptrade_check_status()
-mcp__snaptrade__snaptrade_list_accounts()
-mcp__snaptrade__snaptrade_get_balance(account_id="<from-profile>")
-mcp__snaptrade__snaptrade_get_positions(account_id="<from-profile>")
+mcp__snaptrade-trade__check_status()
+mcp__snaptrade-trade__list_accounts()
+mcp__snaptrade-trade__get_balance(account_id="<from-profile>")
+mcp__snaptrade-trade__get_positions(account_id="<from-profile>")
 ```
 
 Capture:
