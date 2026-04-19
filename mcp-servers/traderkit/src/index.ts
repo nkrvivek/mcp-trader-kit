@@ -81,7 +81,7 @@ const TOOLS = [
     inputSchema: toolInput(PerformanceMetricsArgs, ["returns"]) },
   { name: "thesis_fit", description: "Score how well a trade fits active theses (IN_THESIS/PARTIAL/OFF_THESIS/NO_THESIS_REF). Supports single and batch scoring.",
     inputSchema: toolInput(ThesisFitArgs, ["action", "theses"]) },
-  { name: "session_write", description: "Format session document sections: executed trades table, deferred list, no-trade log, session index row.",
+  { name: "session_write", description: "Format session sections (executed/deferred/no-trade/index row) OR save a full session locally. action=save writes JSON+MD to $TRADERKIT_HOME/sessions/<date>/<profile>-<mode>-<HHMMSS>.{json,md} (default ~/.traderkit/sessions). Always call at end of every run — dry-run, interactive, scheduled — for historical record + replay.",
     inputSchema: toolInput(SessionWriteArgs, ["action"]) },
   { name: "broker_route", description: "Classify broker routing: SNAPTRADE/TRADESTATION/MANUAL/DEFERRED based on broker name and deferred tags.",
     inputSchema: toolInput(BrokerRouteArgs, ["broker", "direction"]) },

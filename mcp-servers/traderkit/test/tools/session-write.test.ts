@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { sessionWriteHandler } from "../../src/tools/session-write.js";
 
 describe("sessionWriteHandler", () => {
@@ -66,5 +69,62 @@ describe("sessionWriteHandler", () => {
   it("requires fields for session index row", async () => {
     const r: any = await sessionWriteHandler({ action: "format_session_index_row" });
     expect(r.error).toMatch(/required/);
+  });
+
+  describe("action=save", () => {
+    let tmp: string;
+    const originalHome = process.env.TRADERKIT_HOME;
+
+    beforeEach(() => {
+      tmp = mkdtempSync(join(tmpdir(), "traderkit-session-"));
+      process.env.TRADERKIT_HOME = tmp;
+    });
+
+    afterEach(() => {
+      if (originalHome === undefined) delete process.env.TRADERKIT_HOME;
+      else process.env.TRADERKIT_HOME = originalHome;
+      rmSync(tmp, { recursive: true, force: true });
+    });
+
+    it("writes JSON + MD to $TRADERKIT_HOME/sessions/<date>/", async () => {
+      const r: any = await sessionWriteHandler({
+        action: "save",
+        profile: "personal",
+        mode: "dry-run",
+        date: "2026-04-19",
+        nav: 847772,
+        regime_tier: "CAUTION",
+        executed: [],
+        deferred: [],
+        no_trades: [
+          { ticker: "AAPL", reason: "concentration cap" },
+        ],
+      });
+      expect(r.session_id).toMatch(/^2026-04-19-personal-dry-run-/);
+      expect(r.json_path).toContain(join(tmp, "sessions", "2026-04-19"));
+      expect(r.md_path).toMatch(/\.md$/);
+      expect(r.local_root).toBe(join(tmp, "sessions"));
+
+      const json = JSON.parse(readFileSync(r.json_path, "utf8"));
+      expect(json.profile).toBe("personal");
+      expect(json.mode).toBe("dry-run");
+      expect(json.regime_tier).toBe("CAUTION");
+      expect(json.no_trades).toHaveLength(1);
+
+      const md = readFileSync(r.md_path, "utf8");
+      expect(md).toContain("personal · dry-run · 2026-04-19");
+      expect(md).toContain("**AAPL**");
+    });
+
+    it("accepts pre-formatted markdown_body", async () => {
+      const r: any = await sessionWriteHandler({
+        action: "save",
+        profile: "bildof",
+        mode: "dry-run",
+        markdown_body: "# custom header\n\nbody here",
+      });
+      const md = readFileSync(r.md_path, "utf8");
+      expect(md).toContain("# custom header");
+    });
   });
 });
