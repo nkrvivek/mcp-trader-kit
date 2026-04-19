@@ -107,6 +107,111 @@ function parseInfoTableXml(xml: string, reportDate: string, accession: string): 
   return out;
 }
 
+export interface SecActivistFiling {
+  form: string;
+  filing_date: string;
+  accession: string;
+  filer_names: string[];
+  filer_ciks: string[];
+  subject_names: string[];
+  subject_tickers: string[];
+  subject_ciks: string[];
+  doc_url: string;
+}
+
+interface ParsedName { name: string; tickers: string[]; cik?: string | undefined }
+
+function parseDisplayNames(raw: string[] | undefined): ParsedName[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ParsedName[] = [];
+  for (const s of raw) {
+    const tickerMatch = s.match(/\(([^)]+)\)\s+\(CIK/i);
+    const cikMatch = s.match(/CIK\s+(\d{10})/i);
+    const nameMatch = s.match(/^(.+?)\s+\(/);
+    const tickers = tickerMatch ? tickerMatch[1]!.split(",").map((t) => t.trim()).filter((t) => /^[A-Z\-.]{1,10}$/.test(t)) : [];
+    const entry: ParsedName = {
+      name: (nameMatch?.[1] ?? s).trim(),
+      tickers,
+    };
+    if (cikMatch?.[1]) entry.cik = cikMatch[1];
+    out.push(entry);
+  }
+  return out;
+}
+
+export interface SecFilingSearchOpts {
+  query?: string;
+  forms: string[];
+  start_date: string;
+  end_date: string;
+  limit?: number;
+}
+
+export async function secSearchFilings(opts: SecFilingSearchOpts): Promise<SecActivistFiling[]> {
+  const params = new URLSearchParams({
+    q: opts.query ?? `"${opts.forms[0]}"`,
+    forms: opts.forms.join(","),
+    dateRange: "custom",
+    startdt: opts.start_date,
+    enddt: opts.end_date,
+  });
+  const url = `https://efts.sec.gov/LATEST/search-index?${params}`;
+  try {
+    const res = await secGet(url);
+    const data = (await res.json()) as {
+      hits?: {
+        hits?: Array<{
+          _id?: string;
+          _source?: {
+            form?: string;
+            file_date?: string;
+            display_names?: string[];
+            ciks?: string[];
+            tickers?: string[];
+            adsh?: string;
+          };
+        }>;
+      };
+    };
+    const hits = data.hits?.hits ?? [];
+    const limit = opts.limit ?? 50;
+    const out: SecActivistFiling[] = [];
+    for (const h of hits.slice(0, limit)) {
+      const src = h._source ?? {};
+      const id = h._id ?? "";
+      const [accDocPart, docName] = id.split(":");
+      const accession = src.adsh ?? accDocPart ?? "";
+      const accessionNoDashes = accession.replace(/-/g, "");
+      const allNames = parseDisplayNames(src.display_names);
+      // EDGAR display_names: first entry is subject, subsequent are filers (heuristic).
+      // But often it's reversed. Use presence of ticker to classify: subject typically has ticker.
+      const withTickers = allNames.filter((n) => n.tickers.length > 0);
+      const withoutTickers = allNames.filter((n) => n.tickers.length === 0);
+      const subject = withTickers[0] ?? allNames[0];
+      const filers = withoutTickers.length ? withoutTickers : allNames.slice(1);
+      const firstCik = (src.ciks ?? [])[0] ?? "";
+      const docUrl = firstCik && accessionNoDashes && docName
+        ? `https://www.sec.gov/Archives/edgar/data/${firstCik.replace(/^0+/, "")}/${accessionNoDashes}/${docName}`
+        : "";
+      out.push({
+        form: src.form ?? "",
+        filing_date: src.file_date ?? "",
+        accession,
+        filer_names: filers.map((f) => f.name),
+        filer_ciks: filers.map((f) => f.cik ?? "").filter(Boolean),
+        subject_names: subject ? [subject.name] : [],
+        subject_tickers: subject?.tickers ?? [],
+        subject_ciks: subject?.cik ? [subject.cik] : [],
+        doc_url: docUrl,
+      });
+    }
+    return out;
+  } catch (e) {
+    process.stderr.write(`traderkit: secSearchFilings failed: ${toMessage(e)}\n`);
+    return [];
+  }
+}
+
 export async function secFundHoldings(cik: string): Promise<Sec13FHolding[]> {
   const padded = cik.replace(/^0+/, "").padStart(10, "0");
   const cikNoLeading = padded.replace(/^0+/, "");

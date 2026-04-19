@@ -28,6 +28,7 @@ import { CalcRollArgs, calcRollHandler } from "./tools/calc-roll.js";
 import { FmpFundamentalsArgs, fmpFundamentalsHandler } from "./tools/fmp-fundamentals.js";
 import { CalcMaxPainArgs, calcMaxPainHandler } from "./tools/calc-max-pain.js";
 import { InstHoldingsArgs, instHoldingsHandler } from "./tools/inst-holdings.js";
+import { TrackActivistsArgs, trackActivistsHandler } from "./tools/track-activists.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -94,6 +95,8 @@ const TOOLS = [
     inputSchema: toolInput(CalcMaxPainArgs, ["ticker"]) },
   { name: "inst_holdings", description: "Institutional holdings tracker (13F). Modes: by_ticker (top 13F filers holding a stock, matched vs known funds like Citadel/BlackRock/Berkshire), by_fund (top positions of a named fund by key or CIK), list_funds (curated CIK map). Returns shares/market-value/weight + build/trim deltas w/ smart-money bias interpretation. FMP source — tier-dependent.",
     inputSchema: toolInput(InstHoldingsArgs, ["mode"]) },
+  { name: "track_activists", description: "Activist/event-driven filings tracker via SEC EDGAR full-text search. Modes: by_ticker (who is filing 13D/13G on this stock?), by_fund (recent Pershing/Icahn/Elliott/Starboard filings), recent (market-wide activist scan), list_activists (curated activist CIKs: Ackman, Icahn, Elliott, Starboard, Loeb, Peltz, ValueAct, JANA, etc.). Surfaces 13D (hard intent), 13D/A (amendment), 13G (passive >5%), DEF 14A (proxy). Fresh 13D = priority.",
+    inputSchema: toolInput(TrackActivistsArgs, ["mode"]) },
 ];
 
 const SECRETS = [
@@ -165,6 +168,7 @@ async function main() {
         case "fmp_fundamentals": result = await fmpFundamentalsHandler(req.params.arguments); break;
         case "calc_max_pain":  result = await calcMaxPainHandler(req.params.arguments); break;
         case "inst_holdings":  result = await instHoldingsHandler(req.params.arguments); break;
+        case "track_activists": result = await trackActivistsHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
