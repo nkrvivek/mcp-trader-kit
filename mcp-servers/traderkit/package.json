@@ -45,11 +45,9 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "snaptrade-mcp-ts": "^0.1.0",
-    "snaptrade-trade-mcp": "^0.1.0"
+    "snaptrade-trade-mcp": "^0.2.0"
   },
   "peerDependenciesMeta": {
-    "snaptrade-mcp-ts": { "optional": false },
     "snaptrade-trade-mcp": { "optional": false }
   },
   "devDependencies": {

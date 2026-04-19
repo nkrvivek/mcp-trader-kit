@@ -64,7 +64,7 @@ npm install
 ./scripts/setup.sh
 ```
 
-This installs three MCP servers from npm (`traderkit`, `snaptrade-mcp-ts`, `snaptrade-trade-mcp`) — no local builds required.
+This installs two MCP servers from npm (`traderkit` risk gate + `snaptrade-trade-mcp` unified reads+trading) — no local builds required.
 
 The setup wizard prompts for a **vault path** (where session docs + notes live). Pick any directory — `~/trading-vault` works. It will:
 

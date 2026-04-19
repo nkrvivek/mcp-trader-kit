@@ -18,11 +18,10 @@ curl -fsSL https://raw.githubusercontent.com/nkrvivek/traderkit/main/scripts/boo
 **Manual** (Node 20+ + Claude Code CLI already installed):
 ```bash
 npx -y traderkit                    # risk gate MCP (this repo)
-npx -y snaptrade-mcp-ts             # portfolio reads
-npx -y snaptrade-trade-mcp          # trade execution
+npx -y snaptrade-trade-mcp          # unified reads + trade execution
 ```
 
-All three packages are required for interactive mode. `traderkit` declares the other two as peerDependencies.
+Both packages are required. `traderkit` declares `snaptrade-trade-mcp` as a peerDependency. `snaptrade-trade-mcp@0.2.0+` covers both read endpoints (accounts, balances, positions, holdings, activities) and trading (equity + multi-leg options) — no separate read server needed.
 
 ## What it does
 
