@@ -51,7 +51,13 @@ async function fmpGet(path: string, params: Record<string, string>): Promise<unk
   if (!key) throw new Error("FMP_API_KEY not set");
   const qs = new URLSearchParams({ ...params, apikey: key });
   const url = `${FMP_BASE}${path}?${qs}`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { Accept: "application/json" } });
+  } catch (e) {
+    // Network/TLS/DNS errors: Node may include the URL (w/ apikey) in the message.
+    throw new Error(`FMP fetch ${path}: ${sanitizeBody(toMessage(e), key)}`);
+  }
   if (res.status === 402) {
     throw new Error(`FMP 402 ${path}: restricted — upgrade tier`);
   }

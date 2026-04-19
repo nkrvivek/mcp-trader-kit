@@ -3,7 +3,18 @@
 
 import { toMessage } from "../utils/errors.js";
 
-const SEC_UA = process.env.SEC_USER_AGENT ?? "traderkit-mcp research (contact: nkrvivek@gmail.com)";
+// SEC fair-use policy requires a User-Agent w/ contact email.
+// Prefer the user's SEC_USER_AGENT env. Fall back to a generic dev string w/ a loud warning
+// so production deployments are forced to set an explicit contact.
+const SEC_UA = (() => {
+  const env = process.env.SEC_USER_AGENT?.trim();
+  if (env) return env;
+  process.stderr.write(
+    "traderkit: WARNING — SEC_USER_AGENT not set. Using generic dev UA. " +
+    "Set SEC_USER_AGENT=\"your-app contact: you@example.com\" for production.\n",
+  );
+  return "traderkit-mcp-dev (set SEC_USER_AGENT env for production)";
+})();
 
 // SEC fair-use: individual response size cap to prevent memory blow-ups on very large 13F XML.
 const SEC_MAX_RESPONSE_BYTES = 25 * 1024 * 1024; // 25 MB
