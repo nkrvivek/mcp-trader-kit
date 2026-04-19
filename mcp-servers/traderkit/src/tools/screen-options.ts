@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { uwOptionChain, uwExpiryList, uwIvRank, uwStockState } from "../clients/uw-client.js";
-import { finnhubProfile, finnhubEarnings } from "../clients/finnhub-client.js";
+import { finnhubProfile } from "../clients/finnhub-client.js";
+import { fmpEarnings, fmpDcf, fmpPriceTarget } from "../clients/fmp-client.js";
 import { TickerSchema } from "../utils/schemas.js";
 import { daysUntil } from "../utils/date.js";
 import { round } from "../utils/math.js";
@@ -45,7 +46,14 @@ interface Candidate {
   market_cap_usd?: number | undefined;
   sector?: string | undefined;
   earnings_date?: string | undefined;
+  earnings_timing?: "bmo" | "amc" | "unknown" | undefined;
   earnings_in_window: boolean;
+  dcf_value?: number | undefined;
+  dcf_vs_spot_pct?: number | undefined;
+  target_consensus?: number | undefined;
+  target_high?: number | undefined;
+  target_low?: number | undefined;
+  target_vs_spot_pct?: number | undefined;
   score: number;
   notes: string[];
 }
@@ -66,9 +74,15 @@ export async function screenOptionsHandler(raw: unknown): Promise<{
 
   for (const ticker of args.tickers) {
     try {
-      const [profile, earnings, ivRank, state] = await Promise.all([
+      const today = new Date();
+      const fromIso = today.toISOString().slice(0, 10);
+      const toIso = new Date(today.getTime() + (args.dte_max + 30) * 86_400_000)
+        .toISOString().slice(0, 10);
+      const [profile, earnings, dcf, priceTarget, ivRank, state] = await Promise.all([
         finnhubProfile(ticker),
-        finnhubEarnings(ticker),
+        fmpEarnings(ticker, fromIso, toIso),
+        fmpDcf(ticker),
+        fmpPriceTarget(ticker),
         uwIvRank(ticker),
         uwStockState(ticker),
       ]);
@@ -144,6 +158,12 @@ export async function screenOptionsHandler(raw: unknown): Promise<{
           if (ivRank.iv_rank !== undefined && ivRank.iv_rank > 60) notes.push("high_iv_rank");
           if (leg.volume !== undefined && leg.volume > (leg.open_interest ?? 0)) notes.push("unusual_vol");
 
+          const dcfVsSpotPct = (dcf.dcf !== undefined && state.price)
+            ? round((dcf.dcf / state.price - 1) * 100, 100)
+            : undefined;
+          const targetVsSpotPct = (priceTarget.target_consensus !== undefined && state.price)
+            ? round((priceTarget.target_consensus / state.price - 1) * 100, 100)
+            : undefined;
           candidates.push({
             ticker,
             strategy: args.strategy,
@@ -164,7 +184,14 @@ export async function screenOptionsHandler(raw: unknown): Promise<{
             market_cap_usd: profile.market_cap_usd,
             sector: profile.sector,
             earnings_date: earnings.next_earnings_date,
+            earnings_timing: earnings.timing,
             earnings_in_window: earningsInWindow,
+            dcf_value: dcf.dcf,
+            dcf_vs_spot_pct: dcfVsSpotPct,
+            target_consensus: priceTarget.target_consensus,
+            target_high: priceTarget.target_high,
+            target_low: priceTarget.target_low,
+            target_vs_spot_pct: targetVsSpotPct,
             score: round(score, 10_000),
             notes,
           });

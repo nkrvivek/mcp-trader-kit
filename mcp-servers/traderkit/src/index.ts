@@ -25,6 +25,9 @@ import { SessionWriteArgs, sessionWriteHandler } from "./tools/session-write.js"
 import { BrokerRouteArgs, brokerRouteHandler } from "./tools/broker-route.js";
 import { ScreenOptionsArgs, screenOptionsHandler } from "./tools/screen-options.js";
 import { CalcRollArgs, calcRollHandler } from "./tools/calc-roll.js";
+import { FmpFundamentalsArgs, fmpFundamentalsHandler } from "./tools/fmp-fundamentals.js";
+import { CalcMaxPainArgs, calcMaxPainHandler } from "./tools/calc-max-pain.js";
+import { InstHoldingsArgs, instHoldingsHandler } from "./tools/inst-holdings.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -85,12 +88,19 @@ const TOOLS = [
     inputSchema: toolInput(ScreenOptionsArgs, ["tickers"]) },
   { name: "calc_roll", description: "Find roll candidates for an existing short option. Credit-first: filters strikes/expiries where STO_credit − BTC_cost >= min_net_credit. Ranks by (net_credit / DTE_ext) × new_POP.",
     inputSchema: toolInput(CalcRollArgs, ["ticker", "option_type", "current_strike", "current_expiry"]) },
+  { name: "fmp_fundamentals", description: "FMP fundamentals per ticker — quote (spot, mkt cap), DCF, analyst price target (high/low/median/consensus), and next earnings date + timing (bmo/amc) + consensus EPS. Free tier: 250 calls/day; each ticker uses up to 4 calls. Use for thesis validation + earnings-blackout checks.",
+    inputSchema: toolInput(FmpFundamentalsArgs, ["tickers"]) },
+  { name: "calc_max_pain", description: "Compute Max Pain strike + OI walls for a ticker/expiry. Returns pain curve, put/call walls (support/resistance), P/C OI ratio, and interpretive notes (pin drift, wall strike candidates for CSP/CC). Uses UW option chain + stock state.",
+    inputSchema: toolInput(CalcMaxPainArgs, ["ticker"]) },
+  { name: "inst_holdings", description: "Institutional holdings tracker (13F). Modes: by_ticker (top 13F filers holding a stock, matched vs known funds like Citadel/BlackRock/Berkshire), by_fund (top positions of a named fund by key or CIK), list_funds (curated CIK map). Returns shares/market-value/weight + build/trim deltas w/ smart-money bias interpretation. FMP source — tier-dependent.",
+    inputSchema: toolInput(InstHoldingsArgs, ["mode"]) },
 ];
 
 const SECRETS = [
   process.env.SNAPTRADE_CONSUMER_KEY, process.env.SNAPTRADE_USER_SECRET,
   process.env.SNAPTRADE_USER_ID, process.env.SNAPTRADE_CLIENT_ID,
   process.env.UW_TOKEN, process.env.FINNHUB_API_KEY,
+  process.env.FMP_API_KEY,
 ].filter((x): x is string => !!x);
 
 const SNAPTRADE_READ_ALLOWED_ENV = [
@@ -152,6 +162,9 @@ async function main() {
         case "broker_route":   result = await brokerRouteHandler(req.params.arguments); break;
         case "screen_options": result = await screenOptionsHandler(req.params.arguments); break;
         case "calc_roll":      result = await calcRollHandler(req.params.arguments); break;
+        case "fmp_fundamentals": result = await fmpFundamentalsHandler(req.params.arguments); break;
+        case "calc_max_pain":  result = await calcMaxPainHandler(req.params.arguments); break;
+        case "inst_holdings":  result = await instHoldingsHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
