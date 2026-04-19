@@ -41,6 +41,17 @@ AI Assistant ──PreToolUse hook──► traderkit MCP (23 tools)
 
 See the [npm package README](mcp-servers/traderkit/README.md) for detailed documentation of each tool.
 
+## Slash-command skills
+
+`./scripts/setup.sh` also symlinks two Claude Code skills into `~/.claude/skills/`:
+
+| Skill | Command | Purpose |
+|---|---|---|
+| `trade` | `/trade <profile> [flags]` | 5-phase portfolio refresh + trade proposal + risk gate |
+| `review` | `/review <profile> <scope>` | Monthly / quarterly / YTD retrospective analytics |
+
+After setup, you can run `/trade main --mode dry-run` in a Claude session to exercise the full pipeline. Skills are opinion-free — no hard-coded paths, no bundled theses, no Python dependency. See [skills/README.md](skills/README.md).
+
 ## Full setup
 
 Clone, run setup, trade:

@@ -41,6 +41,21 @@ for tpl in example-personal example-llc; do
   fi
 done
 
+say "Symlinking skills → ~/.claude/skills/"
+SKILLS_SRC="$REPO_ROOT/skills"
+SKILLS_DST="$HOME/.claude/skills"
+mkdir -p "$SKILLS_DST"
+for skill in trade review; do
+  if [[ -d "$SKILLS_SRC/$skill" ]]; then
+    if [[ -L "$SKILLS_DST/$skill" ]] || [[ -d "$SKILLS_DST/$skill" ]]; then
+      echo "  $SKILLS_DST/$skill already exists — leaving alone"
+    else
+      ln -s "$SKILLS_SRC/$skill" "$SKILLS_DST/$skill"
+      echo "  linked $skill"
+    fi
+  fi
+done
+
 say "Writing .env template (if missing)"
 if [[ ! -f "$KIT_ROOT/.env" ]]; then
   cat > "$KIT_ROOT/.env" <<'EOF'
@@ -52,6 +67,10 @@ SNAPTRADE_USER_ID=
 SNAPTRADE_USER_SECRET=
 EXA_API_KEY=
 UW_TOKEN=
+FMP_API_KEY=
+FINNHUB_API_KEY=
+SEC_USER_AGENT="your-app contact: you@example.com"
+TRADERKIT_VAULT=
 EOF
   chmod 600 "$KIT_ROOT/.env"
 fi
