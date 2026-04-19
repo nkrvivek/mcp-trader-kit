@@ -94,6 +94,16 @@ mcp__memory__create_entities(
 
 Skip silently if memory MCP not configured.
 
+## Step 4b: Optional — weekly scoreboard hint
+
+If `--trigger monthly-review` or user-requested, call:
+
+```
+mcp__traderkit__report_trades(since_days=7)
+```
+
+Surface in end-of-run summary: premium collected, win rate, realized P&L, top 3 tickers by P&L. Builds confidence — users see their options program actually works.
+
 ## Step 5: End-of-run summary
 
 ```

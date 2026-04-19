@@ -97,7 +97,29 @@ mcp__traderkit__propose_trade(
 
 Returns sized proposal w/ sizing trace + cap-enforcement decision.
 
-## Step 7: Format + emit
+## Step 7a: Plain-English payoff (demystify options)
+
+For every option structure candidate, call `explain_payoff` before emitting to user. Options-apprehensive traders need plain-English narration of what happens under each scenario, not Greeks.
+
+```
+mcp__traderkit__explain_payoff(
+  ticker="<T>",
+  structure="<covered_call|cash_secured_put|put_credit_spread|call_credit_spread>",
+  spot=<spot>,
+  strike=<strike>,                  # for CC/CSP
+  short_strike=<short>,              # for spreads
+  long_strike=<long>,                # for spreads
+  premium=<net-credit>,
+  contracts=<N>,
+  dte=<days>,
+  expiry="<YYYY-MM-DD>",
+  cost_basis=<basis>                 # for CC
+)
+```
+
+Returns `{ narrative[], scenarios[], breakeven, max_profit_usd, max_loss_usd }`. Use these strings verbatim in the Payoff row below.
+
+## Step 7b: Format + emit
 
 ```
 #### Proposal <n> | [CANDIDATE]<tags> | <ticker> <structure> | <broker>
@@ -107,10 +129,17 @@ Returns sized proposal w/ sizing trace + cap-enforcement decision.
 - Fundamentals: DCF $<dcf> vs spot $<spot> · Target $<target> · Earn <date> <time>
 - Structure:  <human-label>
 - Size:       $<size> (<pct>% NAV) · trace: "<formula>"
+- Payoff:     <narrative[0]>
+              ✓ <scenarios[0].condition> → <scenarios[0].outcome>
+              ✗ <scenarios[-1].condition> → <scenarios[-1].outcome>
+              Breakeven: $<breakeven> · Max profit: $<max_profit_usd> · Max loss: $<max_loss_usd|∞>
+- Guardrails: ✅ notional $<size> ≤ cap $<max_order_notional> · concentration <pct>% ≤ tier cap <cap>% · regime <tier>·<allow|warn> · POP ~<pct>%
 - Exit:       <exit-plan>
 - Risk:       <risk-note>
 - Status:     [ ] pending
 ```
+
+**Guardrails row format** — pull from check_trade + check_concentration + regime_gate results. Each check rendered as `<metric> <value> <operator> <threshold>` so user can verify arithmetic at a glance. ✅ only if ALL pass; downgrade to ⚠️ on any warn; ❌ on any reject (and proposal should not reach user).
 
 ## Step 8: Gate each (interactive mode)
 

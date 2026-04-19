@@ -29,6 +29,8 @@ import { FmpFundamentalsArgs, fmpFundamentalsHandler } from "./tools/fmp-fundame
 import { CalcMaxPainArgs, calcMaxPainHandler } from "./tools/calc-max-pain.js";
 import { InstHoldingsArgs, instHoldingsHandler } from "./tools/inst-holdings.js";
 import { TrackActivistsArgs, trackActivistsHandler } from "./tools/track-activists.js";
+import { ExplainPayoffArgs, explainPayoffHandler } from "./tools/explain-payoff.js";
+import { ReportTradesArgs, reportTradesHandler } from "./tools/report-trades.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -97,6 +99,10 @@ const TOOLS = [
     inputSchema: toolInput(InstHoldingsArgs, ["mode"]) },
   { name: "track_activists", description: "Activist/event-driven filings tracker via SEC EDGAR full-text search. Modes: by_ticker (who is filing 13D/13G on this stock?), by_fund (recent Pershing/Icahn/Elliott/Starboard filings), recent (market-wide activist scan), list_activists (curated activist CIKs: Ackman, Icahn, Elliott, Starboard, Loeb, Peltz, ValueAct, JANA, etc.). Surfaces 13D (hard intent), 13D/A (amendment), 13G (passive >5%), DEF 14A (proxy). Fresh 13D = priority.",
     inputSchema: toolInput(TrackActivistsArgs, ["mode"]) },
+  { name: "explain_payoff", description: "Plain-English payoff narration for a proposed trade. Supports covered_call, cash_secured_put, put_credit_spread, call_credit_spread, long_stock. Returns narrative + scenarios (win/partial/worst), breakeven, max profit/loss in dollars. Use in Phase 4 alongside propose_trade so users see 'if X happens you make $Y' before approving. Demystifies options for new traders.",
+    inputSchema: toolInput(ExplainPayoffArgs, ["ticker", "structure", "spot"]) },
+  { name: "report_trades", description: "Weekly/monthly trade scoreboard. Reads $TRADERKIT_HOME/sessions/**/*.json (from session_write action=save) and aggregates: trades executed, premium collected, realized P&L, win rate, breakdown by structure/ticker/regime. Defaults to last 7 days, live modes only (include_dry_run=true to include paper trades). Answers 'how did my covered-call ladder actually perform?' without a vault.",
+    inputSchema: toolInput(ReportTradesArgs, []) },
 ];
 
 const SECRETS = [
@@ -169,6 +175,8 @@ async function main() {
         case "calc_max_pain":  result = await calcMaxPainHandler(req.params.arguments); break;
         case "inst_holdings":  result = await instHoldingsHandler(req.params.arguments); break;
         case "track_activists": result = await trackActivistsHandler(req.params.arguments); break;
+        case "explain_payoff": result = await explainPayoffHandler(req.params.arguments); break;
+        case "report_trades":  result = await reportTradesHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
