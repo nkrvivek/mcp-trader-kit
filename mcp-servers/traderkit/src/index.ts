@@ -31,6 +31,10 @@ import { InstHoldingsArgs, instHoldingsHandler } from "./tools/inst-holdings.js"
 import { TrackActivistsArgs, trackActivistsHandler } from "./tools/track-activists.js";
 import { ExplainPayoffArgs, explainPayoffHandler } from "./tools/explain-payoff.js";
 import { ReportTradesArgs, reportTradesHandler } from "./tools/report-trades.js";
+import { VerifyFillArgs, verifyFillHandler } from "./tools/verify-fill.js";
+import { RepricingCheckArgs, repricingCheckHandler } from "./tools/repricing-check.js";
+import { ReconcileReminderArgs, reconcileReminderHandler } from "./tools/reconcile-reminder.js";
+import { ExpiryPriorityArgs, expiryPriorityHandler } from "./tools/expiry-priority.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -103,6 +107,14 @@ const TOOLS = [
     inputSchema: toolInput(ExplainPayoffArgs, ["ticker", "structure", "spot"]) },
   { name: "report_trades", description: "Weekly/monthly trade scoreboard. Reads $TRADERKIT_HOME/sessions/**/*.json (from session_write action=save) and aggregates: trades executed, premium collected, realized P&L, win rate, breakdown by structure/ticker/regime. Defaults to last 7 days, live modes only (include_dry_run=true to include paper trades). Answers 'how did my covered-call ladder actually perform?' without a vault.",
     inputSchema: toolInput(ReportTradesArgs, []) },
+  { name: "verify_fill", description: "R4 fill verification. Compare intended vs filled quantities per leg and coerce session status label ('executed' | 'partial-fill (N/M)' | 'submitted-unverified' | 'failed'). Required before any session_write status=executed. Source tag required (ib-gateway | ib-flex | snaptrade-list-orders | tradestation | manual). Origin: BBAI 2026-04-17 ×25 SP submitted / 1 filled while session marked executed → 2-day vault drift.",
+    inputSchema: toolInput(VerifyFillArgs, ["source", "legs"]) },
+  { name: "repricing_check", description: "R3 DAY LMT repricing check. Flags stale orders: if age ≥ stale_minutes AND underlying moved ≥ adverse_move_pct, returns REPRICE action. Origin: BBAI $3 May-15 SP × 25 @ $0.10 LMT DAY stayed unfilled 2+h while stock rallied 8.2% → only 1/25 filled.",
+    inputSchema: toolInput(RepricingCheckArgs, ["ticker", "direction", "limit_price", "submitted_at", "underlying_price_at_submit", "underlying_price_now", "intended_qty"]) },
+  { name: "reconcile_reminder", description: "R5 Flex reconcile reminder. IBKR multi-leg sessions must be reconciled against IB Flex within 24h — otherwise vault drifts. Returns shell command w/ configured query_id.",
+    inputSchema: toolInput(ReconcileReminderArgs, ["broker", "order_count", "session_at"]) },
+  { name: "expiry_priority", description: "R8 expiry-day priority stack. Orders expiring legs ITM→ATM→OTM, then new-cycle writes. Flags violations when ITM/ATM legs present alongside new-cycle writes (must process rolls/closes first).",
+    inputSchema: toolInput(ExpiryPriorityArgs, []) },
 ];
 
 const SECRETS = [
@@ -177,6 +189,10 @@ async function main() {
         case "track_activists": result = await trackActivistsHandler(req.params.arguments); break;
         case "explain_payoff": result = await explainPayoffHandler(req.params.arguments); break;
         case "report_trades":  result = await reportTradesHandler(req.params.arguments); break;
+        case "verify_fill":    result = await verifyFillHandler(req.params.arguments); break;
+        case "repricing_check": result = await repricingCheckHandler(req.params.arguments); break;
+        case "reconcile_reminder": result = await reconcileReminderHandler(req.params.arguments); break;
+        case "expiry_priority": result = await expiryPriorityHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);

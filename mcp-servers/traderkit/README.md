@@ -18,14 +18,19 @@ npm install -g traderkit
 
 ## What it does
 
-Twenty-three MCP tools that sit between your AI assistant and your broker:
+Twenty-seven MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
 | **Pre-trade gates** | |
-| `check_trade` | Gate a proposed trade against caps + wash-sale rules |
+| `check_trade` | Composite gate: caps + wash-sale + R0 freshness + R1 expiry-window + R2 strike-grid + R7 thesis-required |
 | `check_wash_sale` | Standalone ±30-day wash-sale window check |
 | `regime_gate` | Market regime sizing gate — adjusts notional, blocks actions by tier |
+| **Execution discipline (R0–R8)** | |
+| `verify_fill` | R4: classify fill status (executed / partial-fill N/M / submitted-unverified) before session_write marks executed |
+| `repricing_check` | R3: flag stale DAY LMT orders (>30min + >2% adverse move) → REPRICE |
+| `reconcile_reminder` | R5: IBKR multi-leg → require IB Flex reconcile within 24h; returns shell command |
+| `expiry_priority` | R8: expiry-day ordering (ITM→ATM→OTM→new-cycle) w/ violation flags |
 | **Portfolio analysis** | |
 | `check_concentration` | Portfolio concentration analysis with HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP labels + HHI |
 | `scan_tlh` | Find tax-loss harvesting candidates (wash-sale-clean) |
@@ -54,15 +59,41 @@ Twenty-three MCP tools that sit between your AI assistant and your broker:
 
 ### `check_trade`
 
-The primary gate. Validates:
+The primary gate. Validates, in order:
 
+- **R0 freshness (hard)** — every live-data input must carry an `as_of` ISO timestamp within its TTL. Missing/stale = reject. No inline opt-out.
 - **Order size cap** — rejects if `notional_usd` exceeds `max_order_notional`
-- **Concentration cap** — rejects if post-trade single-name exposure exceeds `max_single_name_pct`
+- **Concentration cap** — rejects if post-trade single-name exposure exceeds `max_single_name_pct`; in strict_mode also rejects when `portfolio_total_usd` is missing
 - **Forbidden tools** — blocks specific broker tools (e.g., margin tools)
 - **Forbidden leg shapes** — blocks option structures (e.g., `naked_put`, `naked_call`)
+- **R1 expiry-day window** — blocks new short legs on expiry day during configured window (default 13:30–14:30Z)
+- **R2 strike-grid** — requires ≥3 adjacent strikes w/ theta-per-Δ comparison; rejects selection materially worse than best
+- **R7 thesis-required** — requires active `thesis_ref` (or declared `discretionary_event` + ≥10-char rationale)
 - **Wash-sale check** — flags if same ticker was sold at a loss within ±30 days (same `tax_entity`)
 
-Returns `{ pass: boolean, reasons: string[], warnings: string[] }`.
+Returns `{ pass: boolean, reasons: string[], warnings: string[], ticket_id?: string }`. Each run also appends to `$TRADERKIT_HOME/gate_audit/YYYY-MM-DD.jsonl` (hash-chained append-only audit).
+
+**Stale data = no trade, ever.** In `strict_mode` (default true), any gate that can't verify its data fails-closed. Disable individual rules only via profile-level toggles (`rules.R0_no_stale_data: false`), not per-request.
+
+### `verify_fill` (R4)
+
+Compare intended vs filled quantities per leg and coerce session status. Required before `session_write` marks status as `executed`.
+
+Input: `legs[{leg_id, intended_qty, filled_qty, status?}]` + `source` tag (`ib-gateway` | `ib-flex` | `snaptrade-list-orders` | `tradestation` | `manual`).
+
+Returns `overall_status` (`executed` | `partial-fill` | `submitted-unverified` | `failed`), `coerced_status_label` for ready-to-write frontmatter, `safe_to_mark_executed: boolean`, and warnings (e.g., `ib-gateway` auto-warn that Friday fills are only visible via Flex on Monday).
+
+### `repricing_check` (R3)
+
+Given an order in flight — `submitted_at`, `limit_price`, `underlying_price_at_submit`, `underlying_price_now` — returns `action` (`HOLD` | `REPRICE` | `CANCEL`) + reasons. Flags `REPRICE` when age ≥ `stale_minutes` (default 30) AND underlying moved ≥ `adverse_move_pct` (default 2%).
+
+### `reconcile_reminder` (R5)
+
+After any IBKR multi-leg session (`order_count ≥ 2`), checks whether IB Flex reconcile is overdue vs `sla_hours` (default 24). Returns the shell command to run with the configured query_id: `cd ~/Development/radon && .venv/bin/python3 scripts/trade_blotter/flex_query.py --json --query-id <qid>`.
+
+### `expiry_priority` (R8)
+
+Given `expiring_legs[]` (w/ strike, underlying_price, option_type, side) and planned `new_cycle_legs[]`, returns an ordered processing list (ITM first → ATM → OTM → new-cycle) and flags violations when ITM/ATM resolution is pending while new-cycle writes are queued.
 
 ### `check_wash_sale`
 

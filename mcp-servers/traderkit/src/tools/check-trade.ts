@@ -3,6 +3,20 @@ import { composeCheckTrade } from "../gates/compose.js";
 import type { Profile } from "../profiles/schema.js";
 import type { SnaptradeReadClient } from "../mcp/snaptrade-read-client.js";
 
+const StrikeGridEntry = z.object({
+  strike: z.number(),
+  premium: z.number().nonnegative(),
+  delta: z.number(),
+  notes: z.string().optional(),
+});
+
+const ActiveThesis = z.object({
+  thesis_id: z.string().min(1),
+  tickers: z.array(z.string()).min(1),
+  structures: z.array(z.string()).optional(),
+  status: z.enum(["active", "paused", "closed"]),
+});
+
 export const CheckTradeArgs = z.object({
   profile: z.string().min(1),
   tool: z.string().min(1),
@@ -14,6 +28,16 @@ export const CheckTradeArgs = z.object({
   portfolio_total_usd: z.number().nonnegative().default(0),
   existing_ticker_exposure_usd: z.number().nonnegative().default(0),
   require_wash_sale_check: z.boolean().default(false),
+  now: z.string().optional(),
+  expiry_date: z.string().optional(),
+  selected_strike: z.number().optional(),
+  strike_grid: z.array(StrikeGridEntry).optional(),
+  grid_as_of: z.string().optional(),
+  is_wheel_assignment_leg: z.boolean().optional(),
+  thesis_ref: z.string().optional(),
+  discretionary_event: z.boolean().optional(),
+  discretionary_rationale: z.string().optional(),
+  active_theses: z.array(ActiveThesis).optional(),
 });
 
 export interface CheckTradeDeps {
@@ -24,7 +48,7 @@ export interface CheckTradeDeps {
 export async function checkTradeHandler(
   raw: unknown,
   deps: CheckTradeDeps
-): Promise<{ pass: boolean; reasons: string[]; warnings: string[] }> {
+): Promise<{ pass: boolean; reasons: string[]; warnings: string[]; ticket_id?: string }> {
   const args = CheckTradeArgs.parse(raw);
   const profile = deps.allProfiles.find((p) => p.name === args.profile);
   if (!profile) {
@@ -40,9 +64,11 @@ export async function checkTradeHandler(
     portfolio_total_usd: args.portfolio_total_usd,
     existing_ticker_exposure_usd: args.existing_ticker_exposure_usd,
   };
-  const trade = args.leg_shape !== undefined
-    ? { ...tradeBase, leg_shape: args.leg_shape }
-    : tradeBase;
+  const trade = {
+    ...tradeBase,
+    ...(args.leg_shape !== undefined ? { leg_shape: args.leg_shape } : {}),
+    ...(args.selected_strike !== undefined ? { selected_strike: args.selected_strike } : {}),
+  };
 
   return composeCheckTrade({
     profile,
@@ -53,5 +79,14 @@ export async function checkTradeHandler(
       return deps.snaptradeRead.getActivities(accounts, since);
     },
     requireWashSaleCheck: args.require_wash_sale_check,
+    now: args.now ? new Date(args.now) : undefined,
+    expiry_date: args.expiry_date,
+    strike_grid: args.strike_grid,
+    grid_as_of: args.grid_as_of,
+    is_wheel_assignment_leg: args.is_wheel_assignment_leg,
+    thesis_ref: args.thesis_ref,
+    discretionary_event: args.discretionary_event,
+    discretionary_rationale: args.discretionary_rationale,
+    active_theses: args.active_theses,
   });
 }

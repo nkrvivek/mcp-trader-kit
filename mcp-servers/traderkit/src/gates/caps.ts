@@ -9,6 +9,7 @@ export interface TradeProposal {
   leg_shape?: string;
   portfolio_total_usd: number;
   existing_ticker_exposure_usd: number;
+  selected_strike?: number;
 }
 
 export interface GateResult {

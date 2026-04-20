@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { composeCheckTrade } from "../../src/gates/compose.js";
-import type { Profile } from "../../src/profiles/schema.js";
+import { type Profile, PERMISSIVE_RULES } from "../../src/profiles/schema.js";
 
 const BILDOF: Profile = {
   name: "bildof", broker: "snaptrade",
   account_id: "11111111-1111-1111-1111-111111111111",
   tax_entity: "llc-bildof",
   caps: { max_order_notional: 5000, max_single_name_pct: 10, forbidden_tools: [], forbidden_leg_shapes: [] },
+  rules: PERMISSIVE_RULES,
 };
 
 describe("composeCheckTrade", () => {
@@ -43,7 +44,7 @@ describe("composeCheckTrade", () => {
     expect(r.reasons.some((x) => /wash/i.test(x))).toBe(true);
   });
 
-  it("warns but passes when activities fetch fails and require=false", async () => {
+  it("warns but passes when activities fetch fails w/ non-strict permissive profile", async () => {
     const r = await composeCheckTrade({
       profile: BILDOF,
       allProfiles: [BILDOF],
@@ -55,10 +56,10 @@ describe("composeCheckTrade", () => {
       requireWashSaleCheck: false,
     });
     expect(r.pass).toBe(true);
-    expect(r.warnings.some((x) => /wash-sale check unavailable/.test(x))).toBe(true);
+    expect(r.warnings.some((x) => /wash-sale activities fetch failed/.test(x))).toBe(true);
   });
 
-  it("rejects when activities fetch fails and require=true", async () => {
+  it("rejects when activities fetch fails and require=true (strict override)", async () => {
     const r = await composeCheckTrade({
       profile: BILDOF,
       allProfiles: [BILDOF],
@@ -70,6 +71,21 @@ describe("composeCheckTrade", () => {
       requireWashSaleCheck: true,
     });
     expect(r.pass).toBe(false);
-    expect(r.reasons[0]).toMatch(/wash-sale check required/);
+    expect(r.reasons[0]).toMatch(/wash-sale activities fetch failed/);
+  });
+
+  it("rejects by default (strict_mode) when activities fetch fails", async () => {
+    const strictProfile: Profile = { ...BILDOF, rules: undefined };
+    const r = await composeCheckTrade({
+      profile: strictProfile,
+      allProfiles: [strictProfile],
+      trade: {
+        tool: "equity_force_place", ticker: "AAPL", direction: "BUY",
+        qty: 1, notional_usd: 100, portfolio_total_usd: 100000, existing_ticker_exposure_usd: 0,
+      },
+      fetchActivities: async () => { throw new Error("snaptrade-read down"); },
+    });
+    expect(r.pass).toBe(false);
+    expect(r.reasons.some((x) => /R0|wash-sale|R7|thesis/.test(x))).toBe(true);
   });
 });
