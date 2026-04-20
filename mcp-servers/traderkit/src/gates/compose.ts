@@ -143,7 +143,7 @@ export async function composeCheckTrade(input: ComposeInput): Promise<ComposeRes
     if (ws.flagged) reasons.push(`wash-sale: ${ws.detail}`);
   }
 
-  const pass = reasons.length === 0;
+  const passPreAudit = reasons.length === 0;
   const audit = await writeAuditSafe({
     ts: now.toISOString(),
     profile: input.profile.name,
@@ -160,11 +160,20 @@ export async function composeCheckTrade(input: ComposeInput): Promise<ComposeRes
         activities_as_of: input.activities_as_of,
       },
     },
-    pass,
+    pass: passPreAudit,
     reasons,
     warnings,
   });
 
+  if (!audit) {
+    const msg = "audit write failed — no durable trail (check TRADERKIT_HOME + disk)";
+    if (strict) reasons.push(msg);
+    else warnings.push(msg);
+  } else if (audit.chain_warning) {
+    warnings.push(`audit chain: ${audit.chain_warning}`);
+  }
+
+  const pass = reasons.length === 0;
   const result: ComposeResult = { pass, reasons, warnings };
   if (audit) result.ticket_id = audit.ticket_id;
   return result;

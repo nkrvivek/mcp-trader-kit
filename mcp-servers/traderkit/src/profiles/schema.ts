@@ -18,8 +18,8 @@ export const RulesToggles = z.object({
   regime_ttl_sec: z.number().positive().default(900),
   portfolio_total_ttl_sec: z.number().positive().default(14400),
   activities_ttl_sec: z.number().positive().default(86400),
-  expiry_day_window_start_utc: z.string().default("13:30"),
-  expiry_day_window_end_utc: z.string().default("14:30"),
+  expiry_day_window_start_utc: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM 24h UTC").default("13:30"),
+  expiry_day_window_end_utc: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM 24h UTC").default("14:30"),
 });
 export type RulesToggles = z.infer<typeof RulesToggles>;
 

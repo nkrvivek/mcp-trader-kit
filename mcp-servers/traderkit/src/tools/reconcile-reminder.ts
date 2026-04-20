@@ -7,7 +7,7 @@ export const ReconcileReminderArgs = z.object({
   last_reconcile_at: z.string().optional(),
   now: z.string().optional(),
   sla_hours: z.number().positive().default(24),
-  flex_query_id: z.string().optional(),
+  flex_query_id: z.string().regex(/^\d{1,12}$/, "flex_query_id must be 1–12 digits").optional(),
 });
 
 export type ReconcileReminderResult = {
