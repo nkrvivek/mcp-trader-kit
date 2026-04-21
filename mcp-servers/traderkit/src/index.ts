@@ -2,7 +2,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { ZodObject, ZodRawShape } from "zod";
+import { z, type ZodObject, type ZodRawShape } from "zod";
 import { loadAllProfiles } from "./profiles/loader.js";
 import { PROFILES_DIR } from "./config.js";
 import { connectSnaptradeRead, type SnaptradeReadClient } from "./mcp/snaptrade-read-client.js";
@@ -39,14 +39,17 @@ import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
   schema: ZodObject<S>,
-  required: readonly (keyof S & string)[],
+  _required: readonly (keyof S & string)[],
 ) {
-  return {
-    type: "object" as const,
-    additionalProperties: false as const,
-    properties: schema.shape,
-    required: [...required],
-  };
+  const js = z.toJSONSchema(schema, {
+    io: "input",
+    unrepresentable: "any",
+  }) as Record<string, unknown>;
+  delete js["$schema"];
+  if (js["additionalProperties"] === undefined) {
+    js["additionalProperties"] = false;
+  }
+  return js;
 }
 
 const EMPTY_INPUT = {
