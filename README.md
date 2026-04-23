@@ -4,7 +4,7 @@
 [![CI](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml/badge.svg)](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Risk-gate MCP server for AI-assisted trading. 27 tools that enforce caps, wash-sale rules, regime-based sizing, execution-discipline rules (R0–R8), and portfolio analysis — plus options screening, 13F smart-money tracking, and activist-filing surveillance — before any order hits your broker.
+Risk-gate MCP server for AI-assisted trading. 28 tools that enforce caps, wash-sale rules, regime-based sizing, execution-discipline rules (R0–R8, R14), and portfolio analysis — plus options screening, 13F smart-money tracking, and activist-filing surveillance — before any order hits your broker.
 
 Built for [Claude Code](https://claude.ai/claude-code). Works with any MCP client.
 
@@ -42,16 +42,16 @@ AI Assistant ──PreToolUse hook──► traderkit MCP (23 tools)
 | Category | Tools |
 |----------|-------|
 | **Pre-trade gates** | `check_trade` (R0/R1/R2/R7 + caps + wash-sale), `check_wash_sale`, `regime_gate` |
-| **Execution discipline** | `verify_fill` (R4), `repricing_check` (R3), `reconcile_reminder` (R5), `expiry_priority` (R8) |
+| **Execution discipline** | `verify_fill` (R4), `repricing_check` (R3), `reconcile_reminder` (R5), `expiry_priority` (R8), `combo_fillability` (R14) |
 | **Portfolio analysis** | `check_concentration`, `scan_tlh`, `classify_holding`, `trigger_check`, `performance_metrics` |
 | **Options screening + rolls** | `screen_options`, `calc_roll`, `calc_max_pain` |
 | **Fundamentals + smart-money** | `fmp_fundamentals`, `inst_holdings`, `track_activists` |
 | **Proposal + tax** | `propose_trade`, `track_tax`, `signal_rank`, `thesis_fit`, `broker_route`, `explain_payoff` |
 | **Session management** | `list_profiles`, `set_profile`, `trading_calendar`, `session_write`, `report_trades` |
 
-## Execution discipline rules (R0–R8)
+## Execution discipline rules (R0–R8, R14)
 
-Codified from real incidents (see [BBAI Apr-17 post-mortem](https://github.com/nkrvivek/traderkit/blob/main/docs/postmortems/bbai-apr17.md)). `check_trade` composes R0/R1/R2/R7 as pre-submit gates; R3/R4/R5/R8 are standalone tools used around the order lifecycle.
+Codified from real incidents (see [BBAI Apr-17 post-mortem](https://github.com/nkrvivek/traderkit/blob/main/docs/postmortems/bbai-apr17.md) + [combo-fillability RFC](docs/fillability-rfc.md)). `check_trade` composes R0/R1/R2/R7 as pre-submit gates; R3/R4/R5/R8/R14 are standalone tools used around the order lifecycle.
 
 | Rule | Gate/Tool | Enforcement |
 |------|-----------|-------------|
@@ -64,6 +64,7 @@ Codified from real incidents (see [BBAI Apr-17 post-mortem](https://github.com/n
 | **R6** | (approval model) | Every order requires explicit in-turn user approval. Existing hard rule. |
 | **R7** | `check_trade` (thesis-required) | Every trade must tie to an active thesis (or declare discretionary_event + ≥10-char rationale). |
 | **R8** | `expiry_priority` | Expiry-day ordering: ITM→ATM→OTM→new-cycle. Violations flagged when new-cycle writes planned before ITM/ATM resolutions. |
+| **R14** | `combo_fillability` | Multi-leg BAG fillability score (HIGH/MEDIUM/LOW) from near-leg DTE/OI, ADV, spot-to-strike, minutes-to-close, leg-width, net-vs-mid. On LOW → emits leg-out plan (BTC near @ ask + STO far @ bid) instead of repricing combo down to zero. Origin: BBAI 2026-04-23 $4P Apr-24/May-01 calendar roll (permId 2061124997) — 3 reprices $0.10→$0.05→$0.00 zero fill → canceled → forced assignment. Also wired into `calc_roll` warnings + `propose_trade` `roll_context` + `repricing_check` BAG path. |
 
 ## Never on stale data
 

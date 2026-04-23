@@ -247,6 +247,74 @@ describe("calcRollHandler", () => {
     expect(r.rolls.some((x) => x.new_strike === 425)).toBe(true);
   });
 
+  it("populates leg_out when near leg thin (DTE≤1 or OI<2k)", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const current = today; // DTE=0 → thin
+    const future = new Date(Date.now() + 8 * 86400_000).toISOString().slice(0, 10);
+    installFetch(
+      buildRoutes({
+        ticker: "BBAI",
+        price: 3.72,
+        expiries: {
+          [current]: [{ strike: 4, type: "P", bid: 0.29, ask: 0.30, delta: -0.55, oi: 1342 }],
+          [future]:  [{ strike: 4, type: "P", bid: 0.38, ask: 0.41, delta: -0.50, oi: 1876 }],
+        },
+      }),
+    );
+
+    const r = await calcRollHandler({
+      ticker: "BBAI",
+      option_type: "put",
+      current_strike: 4,
+      current_expiry: current,
+      qty: 20,
+      direction: "out",
+      min_net_credit: 0,
+      min_dte_extension: 5,
+      max_dte_extension: 30,
+      max_strike_adjust: 5,
+      min_oi: 50,
+    });
+
+    expect(r.warnings.some((w) => w.includes("R14"))).toBe(true);
+    expect(r.rolls.length).toBeGreaterThan(0);
+    const top = r.rolls[0]!;
+    expect(top.leg_out).toBeDefined();
+    expect(top.leg_out!.btc_price).toBeCloseTo(0.30, 2);
+    expect(top.leg_out!.sto_price).toBeCloseTo(0.38, 2);
+    expect(top.leg_out!.est_net).toBeCloseTo(0.08, 2);
+    expect(top.leg_out!.note).toContain("DTE=0");
+  });
+
+  it("omits leg_out when near leg liquid (OI≥2k)", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const current = new Date(Date.now() + 10 * 86400_000).toISOString().slice(0, 10);
+    const future = new Date(Date.now() + 40 * 86400_000).toISOString().slice(0, 10);
+    void today;
+    installFetch(
+      buildRoutes({
+        ticker: "AAPL",
+        price: 180,
+        expiries: {
+          [current]: [{ strike: 175, type: "P", bid: 2.0, ask: 2.1, delta: -0.3, oi: 8000 }],
+          [future]:  [{ strike: 175, type: "P", bid: 3.5, ask: 3.6, delta: -0.28, oi: 10000 }],
+        },
+      }),
+    );
+
+    const r = await calcRollHandler({
+      ticker: "AAPL",
+      option_type: "put",
+      current_strike: 175,
+      current_expiry: current,
+      qty: 1,
+      min_oi: 50,
+    });
+
+    expect(r.warnings.some((w) => w.includes("R14"))).toBe(false);
+    expect(r.rolls[0]!.leg_out).toBeUndefined();
+  });
+
   it("excludes rolls beyond max_strike_adjust", async () => {
     const current = "2026-05-15";
     const future = "2026-06-18";

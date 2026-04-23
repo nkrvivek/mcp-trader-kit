@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { proposeTradeHandler } from "../../src/tools/propose-trade.js";
 import type { Profile } from "../../src/profiles/schema.js";
 
@@ -112,5 +112,90 @@ describe("proposeTradeHandler", () => {
 
     expect(r.thesis_ref).toBe("silver-inflation-hedge");
     expect(r.signal_summary).toBe("UW flow spike + darkpool block");
+  });
+
+  describe("R14 roll_context fillability gate", () => {
+    beforeEach(() => {
+      process.env.UW_TOKEN = "test-uw";
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    function occ(t: string, yymmdd: string, cp: "C" | "P", strike: number): string {
+      const s = String(Math.round(strike * 1000)).padStart(8, "0");
+      return `${t}${yymmdd}${cp}${s}`;
+    }
+    function yymmdd(iso: string): string {
+      return iso.slice(2, 4) + iso.slice(5, 7) + iso.slice(8, 10);
+    }
+    function install(ticker: string, price: number, chain: Record<string, { strike: number; type: "C"|"P"; bid: number; ask: number; oi: number }[]>) {
+      const routes: Record<string, any> = { [`/stock/${ticker}/stock-state`]: { data: { close: price, prev_close: price - 0.1 } } };
+      for (const [iso, legs] of Object.entries(chain)) {
+        routes[`/stock/${ticker}/option-contracts?expiry=${iso}`] = {
+          data: legs.map((l) => ({
+            option_symbol: occ(ticker, yymmdd(iso), l.type, l.strike),
+            nbbo_bid: String(l.bid), nbbo_ask: String(l.ask), open_interest: l.oi, volume: 50,
+          })),
+        };
+        routes[`/stock/${ticker}/greeks?expiry=${iso}`] = { data: [] };
+      }
+      vi.stubGlobal("fetch", vi.fn(async (input: any) => {
+        const url = String(input);
+        const m = Object.keys(routes).filter((p) => url.includes(p)).sort((a,b)=>b.length-a.length);
+        return m.length ? { ok: true, status: 200, text: async () => JSON.stringify(routes[m[0]!]), json: async () => routes[m[0]!] } as any
+                        : { ok: false, status: 404, text: async () => "nf", json: async () => ({}) } as any;
+      }));
+    }
+
+    it("LOW fillability → suggested_structure=leg_out + warning", async () => {
+      install("BBAI", 3.72, {
+        "2026-04-24": [{ strike: 4, type: "P", bid: 0.29, ask: 0.30, oi: 1342 }],
+        "2026-05-01": [{ strike: 4, type: "P", bid: 0.38, ask: 0.41, oi: 1876 }],
+      });
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "BBAI", direction: "SELL_TO_OPEN",
+        current_price: 3.72, portfolio_total_usd: 100000,
+        structure: "calendar_roll",
+        roll_context: {
+          legs: [
+            { action: "BUY",  right: "P", strike: 4, expiry: "2026-04-24" },
+            { action: "SELL", right: "P", strike: 4, expiry: "2026-05-01" },
+          ],
+          net_price: 0.05,
+          tif: "DAY",
+          underlying_adv_30d: 3_800_000,
+          now: "2026-04-23T19:45:00Z",
+          close_time: "2026-04-23T20:00:00Z",
+        },
+      }, deps);
+
+      expect(r.status).toBe("CANDIDATE");
+      expect(r.fillability).toBeDefined();
+      expect(r.fillability.score).toBe("LOW");
+      expect(r.suggested_structure).toBe("leg_out");
+      expect(r.warnings.some((w: string) => w.includes("R14") && w.includes("LOW"))).toBe(true);
+    });
+
+    it("calendar_roll w/o roll_context → warning only", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "SPY", direction: "SELL_TO_OPEN",
+        current_price: 500, portfolio_total_usd: 100000,
+        structure: "calendar_roll",
+      }, deps);
+      expect(r.warnings.some((w: string) => w.includes("roll_context"))).toBe(true);
+      expect(r.fillability).toBeNull();
+    });
+
+    it("non-roll structure → no fillability call", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "SPY", direction: "BUY",
+        current_price: 500, portfolio_total_usd: 100000,
+        structure: "equity",
+      }, deps);
+      expect(r.fillability).toBeNull();
+      expect(r.warnings).toEqual([]);
+    });
   });
 });

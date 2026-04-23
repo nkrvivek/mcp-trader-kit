@@ -2,6 +2,24 @@ import { z } from "zod";
 import type { Profile } from "../profiles/schema.js";
 import { concentrationLabel } from "../utils/concentration.js";
 import { round } from "../utils/math.js";
+import { comboFillabilityHandler } from "./combo-fillability.js";
+
+const RollLegSchema = z.object({
+  action: z.enum(["BUY", "SELL"]),
+  right: z.enum(["C", "P"]),
+  strike: z.number().positive(),
+  expiry: z.string(),
+  ratio: z.number().int().positive().default(1),
+});
+
+const RollContextSchema = z.object({
+  legs: z.array(RollLegSchema).min(2),
+  net_price: z.number(),
+  tif: z.enum(["DAY", "GTC"]).default("DAY"),
+  underlying_adv_30d: z.number().positive().optional(),
+  now: z.string().optional(),
+  close_time: z.string().optional(),
+});
 
 export const ProposeTradeArgs = z.object({
   profile: z.string().min(1),
@@ -14,6 +32,7 @@ export const ProposeTradeArgs = z.object({
   structure: z.string().optional(),
   thesis_ref: z.string().optional(),
   signal_summary: z.string().optional(),
+  roll_context: RollContextSchema.optional(),
 });
 
 const SIZE_MULTIPLIERS: Record<string, number> = {
@@ -79,6 +98,32 @@ export async function proposeTradeHandler(
 
   const postPct = round(((args.existing_ticker_exposure_usd + adjustedSizeUsd) / args.portfolio_total_usd) * 100);
 
+  let fillability: Awaited<ReturnType<typeof comboFillabilityHandler>> | undefined;
+  const warnings: string[] = [];
+  const isRoll = args.structure === "calendar_roll" || args.structure === "diagonal_roll";
+  if (isRoll && args.roll_context) {
+    try {
+      fillability = await comboFillabilityHandler({
+        ticker: args.ticker,
+        legs: args.roll_context.legs,
+        net_price: args.roll_context.net_price,
+        tif: args.roll_context.tif,
+        ...(args.roll_context.underlying_adv_30d !== undefined && { underlying_adv_30d: args.roll_context.underlying_adv_30d }),
+        ...(args.roll_context.now && { now: args.roll_context.now }),
+        ...(args.roll_context.close_time && { close_time: args.roll_context.close_time }),
+      });
+      if (fillability.score === "LOW") {
+        warnings.push(`R14: combo fillability LOW (${fillability.numeric_score}/100) — prefer leg_out over BAG submit`);
+      } else if (fillability.score === "MEDIUM") {
+        warnings.push(`R14: combo fillability MEDIUM (${fillability.numeric_score}/100) — consider repricing toward combo mid before submit`);
+      }
+    } catch (e) {
+      warnings.push(`combo_fillability gate failed: ${(e as Error).message}`);
+    }
+  } else if (isRoll && !args.roll_context) {
+    warnings.push(`structure=${args.structure} but no roll_context provided — fillability gate skipped (R14 risk unchecked)`);
+  }
+
   return {
     status: "CANDIDATE",
     ticker: args.ticker,
@@ -103,5 +148,8 @@ export async function proposeTradeHandler(
     thesis_ref: args.thesis_ref ?? null,
     signal_summary: args.signal_summary ?? null,
     cap_check: adjustedSizeUsd <= profile.caps.max_order_notional ? "PASS" : "CAPPED",
+    fillability: fillability ?? null,
+    suggested_structure: fillability?.score === "LOW" ? "leg_out" : (args.structure ?? "equity"),
+    warnings,
   };
 }

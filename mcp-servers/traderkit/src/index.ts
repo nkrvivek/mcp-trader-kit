@@ -33,6 +33,7 @@ import { ExplainPayoffArgs, explainPayoffHandler } from "./tools/explain-payoff.
 import { ReportTradesArgs, reportTradesHandler } from "./tools/report-trades.js";
 import { VerifyFillArgs, verifyFillHandler } from "./tools/verify-fill.js";
 import { RepricingCheckArgs, repricingCheckHandler } from "./tools/repricing-check.js";
+import { ComboFillabilityArgs, comboFillabilityHandler } from "./tools/combo-fillability.js";
 import { ReconcileReminderArgs, reconcileReminderHandler } from "./tools/reconcile-reminder.js";
 import { ExpiryPriorityArgs, expiryPriorityHandler } from "./tools/expiry-priority.js";
 import { redact } from "./redact.js";
@@ -118,6 +119,8 @@ const TOOLS = [
     inputSchema: toolInput(ReconcileReminderArgs, ["broker", "order_count", "session_at"]) },
   { name: "expiry_priority", description: "R8 expiry-day priority stack. Orders expiring legs ITM→ATM→OTM, then new-cycle writes. Flags violations when ITM/ATM legs present alongside new-cycle writes (must process rolls/closes first).",
     inputSchema: toolInput(ExpiryPriorityArgs, []) },
+  { name: "combo_fillability", description: "R14 BAG (multi-leg combo) fillability score. Rule-based heuristic: near-leg DTE/OI, underlying ADV, spot-to-near-strike distance, minutes-to-close, leg-width, net-price-vs-combo-mid. Returns HIGH/MEDIUM/LOW + suggestion (SUBMIT/REPRICE_MID/LEG_OUT/CANCEL) + leg_out_plan (BTC near @ ask + STO far @ bid) when LOW. Origin: BBAI 2026-04-23 $4P Apr-24/May-01 calendar roll (permId 2061124997) — 3 reprices $0.10→$0.05→$0.00 zero fill → canceled → forced assignment. Fix: leg out at T-60, not reprice down.",
+    inputSchema: toolInput(ComboFillabilityArgs, ["ticker", "legs", "net_price"]) },
 ];
 
 const SECRETS = [
@@ -196,6 +199,7 @@ async function main() {
         case "repricing_check": result = await repricingCheckHandler(req.params.arguments); break;
         case "reconcile_reminder": result = await reconcileReminderHandler(req.params.arguments); break;
         case "expiry_priority": result = await expiryPriorityHandler(req.params.arguments); break;
+        case "combo_fillability": result = await comboFillabilityHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);

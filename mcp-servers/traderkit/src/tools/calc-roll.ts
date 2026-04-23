@@ -23,6 +23,14 @@ export const CalcRollArgs = z.object({
 
 type Args = z.infer<typeof CalcRollArgs>;
 
+interface LegOutPlan {
+  btc_price: number;
+  sto_price: number;
+  est_net: number;
+  slippage_vs_combo: number;
+  note: string;
+}
+
 interface RollCandidate {
   ticker: string;
   btc_cost_per: number;
@@ -39,6 +47,7 @@ interface RollCandidate {
   underlying_price?: number | undefined;
   score: number;
   improvement: string;
+  leg_out?: LegOutPlan | undefined;
 }
 
 export async function calcRollHandler(raw: unknown): Promise<{
@@ -69,6 +78,14 @@ export async function calcRollHandler(raw: unknown): Promise<{
   }
   const btcCostPer = currentLeg.ask ?? currentLeg.mid ?? 0;
   if (!btcCostPer) warnings.push("BTC cost unavailable; using mid");
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const nearDte = daysBetween(todayIso, args.current_expiry);
+  const nearOi = currentLeg.open_interest ?? 0;
+  const thinNearLeg = nearDte <= 1 || nearOi < 2000;
+  if (thinNearLeg) {
+    warnings.push(`R14: near leg thin (DTE=${nearDte}, OI=${nearOi}) — combo fill probability low, leg_out plan included per candidate`);
+  }
   if (args.option_type === "call" && state.price && state.price > args.current_strike) {
     warnings.push(`short call ITM: spot ${state.price} > strike ${args.current_strike}`);
   }
@@ -126,6 +143,20 @@ export async function calcRollHandler(raw: unknown): Promise<{
       }
       improvements.push(`${dteExt}d more time`);
 
+      let legOut: LegOutPlan | undefined;
+      if (thinNearLeg) {
+        const btcPrice = round(btcCostPer);
+        const stoPrice = round(stoCredit);
+        const estNet = round(stoPrice - btcPrice);
+        legOut = {
+          btc_price: btcPrice,
+          sto_price: stoPrice,
+          est_net: estNet,
+          slippage_vs_combo: round(estNet - round(netCredit)),
+          note: `BTC near (DTE=${nearDte}, OI=${nearOi}) @ ask, STO far @ bid — two single-leg orders fill independently`,
+        };
+      }
+
       rolls.push({
         ticker,
         btc_cost_per: round(btcCostPer),
@@ -142,6 +173,7 @@ export async function calcRollHandler(raw: unknown): Promise<{
         underlying_price: state.price,
         score: round(score, 10_000),
         improvement: improvements.join(", "),
+        leg_out: legOut,
       });
     }
   }

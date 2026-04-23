@@ -26,11 +26,12 @@ Twenty-seven MCP tools that sit between your AI assistant and your broker:
 | `check_trade` | Composite gate: caps + wash-sale + R0 freshness + R1 expiry-window + R2 strike-grid + R7 thesis-required |
 | `check_wash_sale` | Standalone ±30-day wash-sale window check |
 | `regime_gate` | Market regime sizing gate — adjusts notional, blocks actions by tier |
-| **Execution discipline (R0–R8)** | |
+| **Execution discipline (R0–R8, R14)** | |
 | `verify_fill` | R4: classify fill status (executed / partial-fill N/M / submitted-unverified) before session_write marks executed |
-| `repricing_check` | R3: flag stale DAY LMT orders (>30min + >2% adverse move) → REPRICE |
+| `repricing_check` | R3: flag stale DAY LMT orders (>30min + >2% adverse move) → REPRICE. BAG path (R14): if `legs` + `near_leg_dte` supplied, consults `combo_fillability` → emits leg-out plan instead of reprice on LOW. |
 | `reconcile_reminder` | R5: IBKR multi-leg → require IB Flex reconcile within 24h; returns shell command |
 | `expiry_priority` | R8: expiry-day ordering (ITM→ATM→OTM→new-cycle) w/ violation flags |
+| `combo_fillability` | R14: multi-leg BAG fillability score (HIGH/MEDIUM/LOW) + suggestion (SUBMIT/REPRICE_MID/LEG_OUT/CANCEL). On LOW returns `leg_out_plan` (BTC near @ ask + STO far @ bid). Origin: BBAI 2026-04-23 $4P Apr-24/May-01 calendar roll — 3 reprices $0.10→$0.05→$0.00 zero fill → canceled → forced assignment. |
 | **Portfolio analysis** | |
 | `check_concentration` | Portfolio concentration analysis with HEADROOM/NEAR-CAP/AT-CAP/OVER-CAP labels + HHI |
 | `scan_tlh` | Find tax-loss harvesting candidates (wash-sale-clean) |
@@ -90,6 +91,16 @@ Given an order in flight — `submitted_at`, `limit_price`, `underlying_price_at
 ### `reconcile_reminder` (R5)
 
 After any IBKR multi-leg session (`order_count ≥ 2`), checks whether IB Flex reconcile is overdue vs `sla_hours` (default 24). Returns the shell command to run with the configured query_id: `cd ~/Development/radon && .venv/bin/python3 scripts/trade_blotter/flex_query.py --json --query-id <qid>`.
+
+### `combo_fillability` (R14)
+
+Rule-based heuristic for multi-leg option combo fills (calendars, verticals, diagonals). Inputs: legs (action/right/strike/expiry/ratio), `net_price`, `tif`, `underlying_price`, `underlying_adv_30d`, leg mid quotes (`mid`, optional `bid`/`ask`/`oi`/`dte`), `now`, `close_time`.
+
+Scores HIGH/MEDIUM/LOW from: near-leg DTE/OI, underlying ADV, spot-to-near-strike distance, minutes-to-close, leg-width, net-price-vs-combo-mid slippage. Returns `{score, suggestion: SUBMIT | REPRICE_MID | LEG_OUT | CANCEL, reasons[], leg_out_plan?}`. On `LEG_OUT`, `leg_out_plan` gives the two single-leg market orders (BTC near @ ask, STO far @ bid) with estimated net and slippage-vs-combo-mid.
+
+Origin: BBAI 2026-04-23 $4P Apr-24/May-01 calendar roll (permId 2061124997). Three combo reprices $0.10 → $0.05 → $0.00 got zero fill in 18 min; order was canceled and the short $4P went to assignment. Fix: detect LOW fillability at T-60 (thin near leg OI=7, DTE=1, minutes-to-close < 60) and leg out instead of racing the combo down to zero.
+
+`calc_roll` warns automatically when near leg is thin and includes per-candidate `leg_out` plans. `propose_trade` consumes `roll_context` and surfaces the suggestion in the plan. `repricing_check` routes to the BAG path when `legs` + `near_leg_dte` are passed.
 
 ### `expiry_priority` (R8)
 
