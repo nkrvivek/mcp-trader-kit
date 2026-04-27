@@ -44,7 +44,7 @@ describe("traderkit stdio integration", () => {
   it("lists all tools", async () => {
     const r = await client!.listTools();
     const names = r.tools.map((t) => t.name).sort();
-    expect(names).toEqual(["broker_route", "calc_max_pain", "calc_roll", "check_concentration", "check_trade", "check_wash_sale", "classify_holding", "combo_fillability", "expiry_priority", "explain_payoff", "fmp_fundamentals", "inst_holdings", "list_profiles", "performance_metrics", "propose_trade", "reconcile_reminder", "regime_gate", "report_trades", "repricing_check", "scan_tlh", "screen_options", "session_write", "set_profile", "signal_rank", "thesis_fit", "track_activists", "track_tax", "trading_calendar", "trigger_check", "verify_fill"]);
+    expect(names).toEqual(["backtest_signals", "broker_route", "calc_max_pain", "calc_roll", "check_concentration", "check_trade", "check_wash_sale", "classify_holding", "classify_trade_outcome", "combo_fillability", "earnings_calendar", "expiry_priority", "explain_payoff", "fmp_fundamentals", "inst_holdings", "list_profiles", "macro_overlay", "performance_metrics", "propose_trade", "reconcile_reminder", "regime_gate", "report_trades", "repricing_check", "rvi_gap", "scan_tlh", "screen_options", "session_write", "set_profile", "signal_rank", "thesis_fit", "track_activists", "track_tax", "trading_calendar", "trigger_check", "verify_fill"]);
   });
 
   it("list_profiles returns the seeded profile", async () => {

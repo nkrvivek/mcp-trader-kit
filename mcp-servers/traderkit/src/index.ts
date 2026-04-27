@@ -36,6 +36,11 @@ import { RepricingCheckArgs, repricingCheckHandler } from "./tools/repricing-che
 import { ComboFillabilityArgs, comboFillabilityHandler } from "./tools/combo-fillability.js";
 import { ReconcileReminderArgs, reconcileReminderHandler } from "./tools/reconcile-reminder.js";
 import { ExpiryPriorityArgs, expiryPriorityHandler } from "./tools/expiry-priority.js";
+import { EarningsCalendarArgs, earningsCalendarHandler } from "./tools/earnings-calendar.js";
+import { RviGapArgs, rviGapHandler } from "./tools/rvi-gap.js";
+import { ClassifyTradeOutcomeArgs, classifyTradeOutcomeHandler } from "./tools/classify-trade-outcome.js";
+import { MacroOverlayArgs, macroOverlayHandler } from "./tools/macro-overlay.js";
+import { BacktestSignalsArgs, backtestSignalsHandler } from "./tools/backtest-signals.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -119,6 +124,16 @@ const TOOLS = [
     inputSchema: toolInput(ReconcileReminderArgs, ["broker", "order_count", "session_at"]) },
   { name: "expiry_priority", description: "R8 expiry-day priority stack. Orders expiring legs ITM→ATM→OTM, then new-cycle writes. Flags violations when ITM/ATM legs present alongside new-cycle writes (must process rolls/closes first).",
     inputSchema: toolInput(ExpiryPriorityArgs, []) },
+  { name: "backtest_signals", description: "Backtest harness for signal-rank tier framework. Takes historical entries (ticker + tier_at_entry + realized_pnl_usd, optional realized_return_pct, predicted/realized direction) → per-tier hit rate, win/loss count, total + avg P&L, avg return %, direction accuracy. Computes tier-gate impact (P&L savings from skipping WATCH/NOISE). Emits calibration_warnings when lower tiers outperform higher tiers (monotonic check). Use to validate tier scoring formula on real history.",
+    inputSchema: toolInput(BacktestSignalsArgs, ["history"]) },
+  { name: "macro_overlay", description: "Macro regime overlay: DXY trend (vs 50/200 dma) + HYG/LQD spread direction (vs 20 dma) → BULL/NEUTRAL/BEAR macro bias + tail-risk flag (NONE/ELEVATED/EXTREME from VIX spot + term-structure inversion + credit widening) + size modifier (1.0 BULL / 0.75 NEUTRAL / 0.5 BEAR, capped further by tail risk). Sector overlay surfaces commodity/EM/credit/small-cap biases. Returns signal_for_confluence ready to feed signal_rank's MACRO channel.",
+    inputSchema: toolInput(MacroOverlayArgs, ["dxy_spot", "dxy_50dma", "dxy_200dma", "hyg_lqd_ratio", "hyg_lqd_20dma"]) },
+  { name: "classify_trade_outcome", description: "Auto-classifier on closed trades. Parses entry/exit/structure/pnl + optional exit_reason → outcome bucket (WIN_MANAGED / WIN_EXPIRED / LOSS_STOPPED / LOSS_ASSIGNED / LOSS_ROLLED / BREAKEVEN / UNCATEGORIZED) + edge attribution per trade (theta-decay capture, managed-at-50pct discipline, assignment risk, revenge-roll pattern). Returns per-trade classification + portfolio-level summary (win rate, total P&L, bucket counts, avg hold). Fuel for backtest harness + post-mortem reviews.",
+    inputSchema: toolInput(ClassifyTradeOutcomeArgs, ["trades"]) },
+  { name: "rvi_gap", description: "Realized-vs-implied volatility gap. Computes IV-HV gap, ratio, and z-score vs IV history (when supplied). Emits action (SELL_PREMIUM if z≥+1.2σ → premium-rich / BUY_PREMIUM if z≤−1.2σ → premium-cheap / NEUTRAL between). Fallback ratio mode (no history): ratio≥1.5 → SELL, ≤0.8 → BUY. Returns signal_for_confluence object ready to feed signal_rank's VOLATILITY channel.",
+    inputSchema: toolInput(RviGapArgs, ["ticker", "iv_30d", "hv_30d"]) },
+  { name: "earnings_calendar", description: "Earnings calendar preload for held + watchlist tickers. Filters to tickers of interest, computes days_until + earnings_window (TODAY/WITHIN_2D/WITHIN_7D/WITHIN_14D), surfaces conflicting open option legs, and emits flags (R1 held-into-earnings, RED-tier IV crush warning, GREEN-tier candidate, SHORT-leg-thru-earnings). Returns earnings_within_days_map + iv_tier_map ready to feed signal_rank for confluence scoring.",
+    inputSchema: toolInput(EarningsCalendarArgs, ["as_of"]) },
   { name: "combo_fillability", description: "R14 BAG (multi-leg combo) fillability score. Rule-based heuristic: near-leg DTE/OI, underlying ADV, spot-to-near-strike distance, minutes-to-close, leg-width, net-price-vs-combo-mid. Returns HIGH/MEDIUM/LOW + suggestion (SUBMIT/REPRICE_MID/LEG_OUT/CANCEL) + leg_out_plan (BTC near @ ask + STO far @ bid) when LOW. Origin: BBAI 2026-04-23 $4P Apr-24/May-01 calendar roll (permId 2061124997) — 3 reprices $0.10→$0.05→$0.00 zero fill → canceled → forced assignment. Fix: leg out at T-60, not reprice down.",
     inputSchema: toolInput(ComboFillabilityArgs, ["ticker", "legs", "net_price"]) },
 ];
@@ -200,6 +215,11 @@ async function main() {
         case "reconcile_reminder": result = await reconcileReminderHandler(req.params.arguments); break;
         case "expiry_priority": result = await expiryPriorityHandler(req.params.arguments); break;
         case "combo_fillability": result = await comboFillabilityHandler(req.params.arguments); break;
+        case "earnings_calendar": result = await earningsCalendarHandler(req.params.arguments); break;
+        case "rvi_gap": result = await rviGapHandler(req.params.arguments); break;
+        case "classify_trade_outcome": result = await classifyTradeOutcomeHandler(req.params.arguments); break;
+        case "macro_overlay": result = await macroOverlayHandler(req.params.arguments); break;
+        case "backtest_signals": result = await backtestSignalsHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
