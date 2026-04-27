@@ -33,6 +33,10 @@ export const ProposeTradeArgs = z.object({
   thesis_ref: z.string().optional(),
   signal_summary: z.string().optional(),
   roll_context: RollContextSchema.optional(),
+  confluence_score: z.number().min(-50).max(150).optional(),
+  confluence_tier: z.enum(["CORE", "TIER-1", "TIER-2", "WATCH", "NOISE"]).optional(),
+  tactical_hedge: z.boolean().default(false),
+  roll: z.boolean().default(false),
 });
 
 const SIZE_MULTIPLIERS: Record<string, number> = {
@@ -72,6 +76,17 @@ export async function proposeTradeHandler(
     };
   }
 
+  const tier = args.confluence_tier;
+  const tierEligible = tier === "CORE" || tier === "TIER-1";
+  if (tier && !args.tactical_hedge && !args.roll && !tierEligible) {
+    return {
+      status: "REJECTED",
+      reason: `confluence tier ${tier}${args.confluence_score !== undefined ? ` (score ${args.confluence_score})` : ""} below TIER-1 — set tactical_hedge:true if VCG/CRI hedge or roll:true if rolling existing leg`,
+      ticker: args.ticker,
+      confluence: { score: args.confluence_score ?? null, tier },
+    };
+  }
+
   if (headroomLabel === "OVER-CAP" && ["BUY", "BUY_TO_OPEN"].includes(args.direction)) {
     return {
       status: "REJECTED",
@@ -100,6 +115,9 @@ export async function proposeTradeHandler(
 
   let fillability: Awaited<ReturnType<typeof comboFillabilityHandler>> | undefined;
   const warnings: string[] = [];
+  if (!tier && !args.tactical_hedge && !args.roll) {
+    warnings.push("no confluence_tier supplied — TIER-1 gate skipped (provide confluence_tier from signal_rank to enforce gate)");
+  }
   const isRoll = args.structure === "calendar_roll" || args.structure === "diagonal_roll";
   if (isRoll && args.roll_context) {
     try {
@@ -145,6 +163,8 @@ export async function proposeTradeHandler(
       label: headroomLabel,
     },
     regime_tier: args.regime_tier,
+    confluence: tier ? { score: args.confluence_score ?? null, tier, gate: "PASS" } : null,
+    bypass: args.tactical_hedge ? "tactical_hedge" : args.roll ? "roll" : null,
     thesis_ref: args.thesis_ref ?? null,
     signal_summary: args.signal_summary ?? null,
     cap_check: adjustedSizeUsd <= profile.caps.max_order_notional ? "PASS" : "CAPPED",

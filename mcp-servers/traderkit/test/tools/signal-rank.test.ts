@@ -107,4 +107,101 @@ describe("signalRankHandler", () => {
     expect(r.ranked).toHaveLength(0);
     expect(r.total_signals).toBe(0);
   });
+
+  describe("confluence scoring", () => {
+    it("AAPL 4-group + thesis = CORE (score 68)", async () => {
+      const r = await signalRankHandler({
+        signals: [
+          { ticker: "AAPL", group: "POSITIONING", source: "uw_darkpool", direction: "BULLISH", confidence: 0.7 },
+          { ticker: "AAPL", group: "FLOW", source: "uw_flow", direction: "BULLISH", confidence: 0.6 },
+          { ticker: "AAPL", group: "TECHNICAL", source: "uw_technicals", direction: "BULLISH", confidence: 0.6 },
+          { ticker: "AAPL", group: "VOLATILITY", source: "iv_rank", direction: "BULLISH", confidence: 0.5 },
+          { ticker: "AAPL", group: "THESIS", source: "thesis:aapl-cc-ladder", direction: "BULLISH", confidence: 0.8 },
+        ],
+      });
+      const a = r.ranked[0]!;
+      expect(a.ticker).toBe("AAPL");
+      expect(a.groups_hit).toBe(5);
+      expect(a.channels_hit).toBe(5);
+      expect(a.thesis_bonus).toBe(20);
+      expect(a.confluence_score).toBe(50 + 10 + 20);
+      expect(a.tier).toBe("CORE");
+    });
+
+    it("BBAI single source = WATCH (score 12)", async () => {
+      const r = await signalRankHandler({
+        signals: [
+          { ticker: "BBAI", group: "FLOW", source: "uw_flow", direction: "BULLISH", confidence: 0.5 },
+        ],
+      });
+      const a = r.ranked[0]!;
+      expect(a.confluence_score).toBe(10 + 2);
+      expect(a.tier).toBe("WATCH");
+    });
+
+    it("RED tier earnings within 7d applies -15 penalty", async () => {
+      const r = await signalRankHandler({
+        signals: [
+          { ticker: "NVDA", group: "POSITIONING", source: "uw_darkpool", direction: "BULLISH", confidence: 0.7 },
+          { ticker: "NVDA", group: "FLOW", source: "uw_flow", direction: "BULLISH", confidence: 0.6 },
+          { ticker: "NVDA", group: "TECHNICAL", source: "uw_technicals", direction: "BULLISH", confidence: 0.5 },
+          { ticker: "NVDA", group: "VOLATILITY", source: "iv_rank", direction: "BULLISH", confidence: 0.5 },
+        ],
+        earnings_within_days: { NVDA: 5 },
+        iv_tier_by_ticker: { NVDA: "RED" },
+      });
+      const a = r.ranked[0]!;
+      expect(a.earnings_penalty).toBe(15);
+      expect(a.confluence_score).toBe(40 + 8 - 15);
+      expect(a.tier).toBe("TIER-2");
+    });
+
+    it("GREEN tier earnings within 14d applies +10 bonus", async () => {
+      const r = await signalRankHandler({
+        signals: [
+          { ticker: "XLE", group: "POSITIONING", source: "uw_darkpool", direction: "BULLISH", confidence: 0.6 },
+          { ticker: "XLE", group: "MACRO", source: "regime", direction: "BULLISH", confidence: 0.5 },
+        ],
+        earnings_within_days: { XLE: 10 },
+        iv_tier_by_ticker: { XLE: "GREEN" },
+      });
+      const a = r.ranked[0]!;
+      expect(a.green_bonus).toBe(10);
+      expect(a.confluence_score).toBe(20 + 4 + 10);
+      expect(a.tier).toBe("TIER-2");
+    });
+
+    it("infers group from source when not supplied", async () => {
+      const r = await signalRankHandler({
+        signals: [
+          { ticker: "AAPL", source: "uw_darkpool", direction: "BULLISH", confidence: 0.7 },
+        ],
+      });
+      expect(r.ranked[0]!.raw_signals[0]!.group).toBe("POSITIONING");
+    });
+
+    it("dedupes by group:source (different group = different channel)", async () => {
+      const r = await signalRankHandler({
+        signals: [
+          { ticker: "X", group: "POSITIONING", source: "darkpool", direction: "BULLISH", confidence: 0.7 },
+          { ticker: "X", group: "FLOW", source: "darkpool", direction: "BULLISH", confidence: 0.6 },
+        ],
+      });
+      const a = r.ranked[0]!;
+      expect(a.channels_hit).toBe(2);
+      expect(a.groups_hit).toBe(2);
+    });
+
+    it("sorts by confluence_score descending", async () => {
+      const r = await signalRankHandler({
+        signals: [
+          { ticker: "LOW", group: "FLOW", source: "f1", direction: "BULLISH", confidence: 0.9 },
+          { ticker: "HIGH", group: "FLOW", source: "f1", direction: "BULLISH", confidence: 0.4 },
+          { ticker: "HIGH", group: "POSITIONING", source: "p1", direction: "BULLISH", confidence: 0.4 },
+          { ticker: "HIGH", group: "TECHNICAL", source: "t1", direction: "BULLISH", confidence: 0.4 },
+        ],
+      });
+      expect(r.ranked[0]!.ticker).toBe("HIGH");
+    });
+  });
 });
