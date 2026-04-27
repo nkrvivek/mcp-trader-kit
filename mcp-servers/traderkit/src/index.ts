@@ -39,6 +39,7 @@ import { ExpiryPriorityArgs, expiryPriorityHandler } from "./tools/expiry-priori
 import { EarningsCalendarArgs, earningsCalendarHandler } from "./tools/earnings-calendar.js";
 import { RviGapArgs, rviGapHandler } from "./tools/rvi-gap.js";
 import { ClassifyTradeOutcomeArgs, classifyTradeOutcomeHandler } from "./tools/classify-trade-outcome.js";
+import { MacroOverlayArgs, macroOverlayHandler } from "./tools/macro-overlay.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -122,6 +123,8 @@ const TOOLS = [
     inputSchema: toolInput(ReconcileReminderArgs, ["broker", "order_count", "session_at"]) },
   { name: "expiry_priority", description: "R8 expiry-day priority stack. Orders expiring legs ITM→ATM→OTM, then new-cycle writes. Flags violations when ITM/ATM legs present alongside new-cycle writes (must process rolls/closes first).",
     inputSchema: toolInput(ExpiryPriorityArgs, []) },
+  { name: "macro_overlay", description: "Macro regime overlay: DXY trend (vs 50/200 dma) + HYG/LQD spread direction (vs 20 dma) → BULL/NEUTRAL/BEAR macro bias + tail-risk flag (NONE/ELEVATED/EXTREME from VIX spot + term-structure inversion + credit widening) + size modifier (1.0 BULL / 0.75 NEUTRAL / 0.5 BEAR, capped further by tail risk). Sector overlay surfaces commodity/EM/credit/small-cap biases. Returns signal_for_confluence ready to feed signal_rank's MACRO channel.",
+    inputSchema: toolInput(MacroOverlayArgs, ["dxy_spot", "dxy_50dma", "dxy_200dma", "hyg_lqd_ratio", "hyg_lqd_20dma"]) },
   { name: "classify_trade_outcome", description: "Auto-classifier on closed trades. Parses entry/exit/structure/pnl + optional exit_reason → outcome bucket (WIN_MANAGED / WIN_EXPIRED / LOSS_STOPPED / LOSS_ASSIGNED / LOSS_ROLLED / BREAKEVEN / UNCATEGORIZED) + edge attribution per trade (theta-decay capture, managed-at-50pct discipline, assignment risk, revenge-roll pattern). Returns per-trade classification + portfolio-level summary (win rate, total P&L, bucket counts, avg hold). Fuel for backtest harness + post-mortem reviews.",
     inputSchema: toolInput(ClassifyTradeOutcomeArgs, ["trades"]) },
   { name: "rvi_gap", description: "Realized-vs-implied volatility gap. Computes IV-HV gap, ratio, and z-score vs IV history (when supplied). Emits action (SELL_PREMIUM if z≥+1.2σ → premium-rich / BUY_PREMIUM if z≤−1.2σ → premium-cheap / NEUTRAL between). Fallback ratio mode (no history): ratio≥1.5 → SELL, ≤0.8 → BUY. Returns signal_for_confluence object ready to feed signal_rank's VOLATILITY channel.",
@@ -212,6 +215,7 @@ async function main() {
         case "earnings_calendar": result = await earningsCalendarHandler(req.params.arguments); break;
         case "rvi_gap": result = await rviGapHandler(req.params.arguments); break;
         case "classify_trade_outcome": result = await classifyTradeOutcomeHandler(req.params.arguments); break;
+        case "macro_overlay": result = await macroOverlayHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
