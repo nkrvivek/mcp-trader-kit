@@ -195,7 +195,100 @@ describe("proposeTradeHandler", () => {
         structure: "equity",
       }, deps);
       expect(r.fillability).toBeNull();
-      expect(r.warnings).toEqual([]);
+      expect(r.warnings).toEqual([
+        expect.stringContaining("no confluence_tier supplied"),
+      ]);
+    });
+  });
+
+  describe("confluence tier gate", () => {
+    it("rejects WATCH tier without bypass", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "NVDA", direction: "BUY",
+        current_price: 100, portfolio_total_usd: 100000,
+        confluence_tier: "WATCH", confluence_score: 12,
+      }, deps);
+      expect(r.status).toBe("REJECTED");
+      expect(r.reason).toContain("WATCH");
+      expect(r.reason).toContain("below TIER-1");
+    });
+
+    it("rejects NOISE tier without bypass", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "NVDA", direction: "BUY",
+        current_price: 100, portfolio_total_usd: 100000,
+        confluence_tier: "NOISE",
+      }, deps);
+      expect(r.status).toBe("REJECTED");
+    });
+
+    it("rejects TIER-2 without bypass", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "NVDA", direction: "BUY",
+        current_price: 100, portfolio_total_usd: 100000,
+        confluence_tier: "TIER-2",
+      }, deps);
+      expect(r.status).toBe("REJECTED");
+    });
+
+    it("approves TIER-1", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "NVDA", direction: "BUY",
+        current_price: 100, portfolio_total_usd: 100000,
+        confluence_tier: "TIER-1", confluence_score: 45,
+      }, deps);
+      expect(r.status).toBe("CANDIDATE");
+      expect(r.confluence).toEqual({ score: 45, tier: "TIER-1", gate: "PASS" });
+    });
+
+    it("approves CORE", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "NVDA", direction: "BUY",
+        current_price: 100, portfolio_total_usd: 100000,
+        confluence_tier: "CORE",
+      }, deps);
+      expect(r.status).toBe("CANDIDATE");
+    });
+
+    it("tactical_hedge bypasses gate at NOISE tier", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "SPY", direction: "BUY",
+        current_price: 500, portfolio_total_usd: 100000,
+        confluence_tier: "NOISE", tactical_hedge: true,
+      }, deps);
+      expect(r.status).toBe("CANDIDATE");
+      expect(r.bypass).toBe("tactical_hedge");
+    });
+
+    it("roll bypasses gate at WATCH tier", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "NVDA", direction: "SELL_TO_OPEN",
+        current_price: 100, portfolio_total_usd: 100000,
+        confluence_tier: "WATCH", roll: true,
+      }, deps);
+      expect(r.status).toBe("CANDIDATE");
+      expect(r.bypass).toBe("roll");
+    });
+
+    it("missing tier surfaces warning but does not reject", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "NVDA", direction: "BUY",
+        current_price: 100, portfolio_total_usd: 100000,
+      }, deps);
+      expect(r.status).toBe("CANDIDATE");
+      expect(r.warnings.some((w: string) => w.includes("no confluence_tier"))).toBe(true);
+      expect(r.confluence).toBeNull();
+    });
+
+    it("tier check runs after concentration check (over-cap still wins)", async () => {
+      const r = await proposeTradeHandler({
+        profile: "personal", ticker: "AAPL", direction: "BUY",
+        current_price: 200, portfolio_total_usd: 100000,
+        existing_ticker_exposure_usd: 30000,
+        confluence_tier: "CORE",
+      }, deps);
+      expect(r.status).toBe("REJECTED");
+      expect(r.reason).toContain("exceeds");
     });
   });
 });

@@ -2,19 +2,37 @@ import { z } from "zod";
 import { TickerSchema } from "../utils/schemas.js";
 import { round } from "../utils/math.js";
 
+const ChannelGroup = z.enum([
+  "POSITIONING",
+  "FLOW",
+  "TECHNICAL",
+  "VOLATILITY",
+  "MACRO",
+  "FUNDAMENTAL",
+  "THESIS",
+]);
+
+type Group = z.infer<typeof ChannelGroup>;
+type Tier = "CORE" | "TIER-1" | "TIER-2" | "WATCH" | "NOISE";
+
 const SignalInput = z.object({
   ticker: TickerSchema,
   source: z.string().min(1),
+  group: ChannelGroup.optional(),
   direction: z.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
   confidence: z.number().min(0).max(1),
   detail: z.string().optional(),
 });
+
+type Signal = z.infer<typeof SignalInput>;
 
 export const SignalRankArgs = z.object({
   signals: z.array(SignalInput),
   multi_source_bonus: z.number().min(0).max(0.5).default(0.1),
   min_confidence: z.number().min(0).max(1).default(0.3),
   max_results: z.number().positive().default(20),
+  earnings_within_days: z.record(z.string(), z.number()).optional(),
+  iv_tier_by_ticker: z.record(z.string(), z.enum(["GREEN", "YELLOW", "RED"])).optional(),
 });
 
 interface RankedSignal {
@@ -24,16 +42,47 @@ interface RankedSignal {
   source_count: number;
   sources: string[];
   top_detail: string | null;
-  raw_signals: Array<{ source: string; confidence: number; direction: string }>;
+  raw_signals: Array<{ source: string; group: Group; confidence: number; direction: string }>;
+  confluence_score: number;
+  tier: Tier;
+  groups_hit: number;
+  channels_hit: number;
+  thesis_bonus: number;
+  earnings_penalty: number;
+  green_bonus: number;
+}
+
+const SOURCE_GROUP_HEURISTIC: Array<[RegExp, Group]> = [
+  [/darkpool|insider|congress|institut|holding|whale/i, "POSITIONING"],
+  [/flow|sweep|alert|unusual.*opt/i, "FLOW"],
+  [/technical|rsi|moving.*avg|breakout|momentum|seasonal/i, "TECHNICAL"],
+  [/iv|rvi|vol|skew|vega/i, "VOLATILITY"],
+  [/regime|cri|vcg|market_quality|macro|sector/i, "MACRO"],
+  [/earnings|fundamental|income|cashflow|balance/i, "FUNDAMENTAL"],
+  [/thesis/i, "THESIS"],
+];
+
+function inferGroup(source: string): Group {
+  for (const [re, g] of SOURCE_GROUP_HEURISTIC) if (re.test(source)) return g;
+  return "FLOW";
+}
+
+function tierOf(score: number): Tier {
+  if (score >= 60) return "CORE";
+  if (score >= 40) return "TIER-1";
+  if (score >= 25) return "TIER-2";
+  if (score >= 10) return "WATCH";
+  return "NOISE";
 }
 
 export async function signalRankHandler(raw: unknown) {
   const args = SignalRankArgs.parse(raw);
 
-  const byTicker = new Map<string, typeof args.signals>();
+  const byTicker = new Map<string, Signal[]>();
   for (const s of args.signals) {
-    if (!byTicker.has(s.ticker)) byTicker.set(s.ticker, []);
-    byTicker.get(s.ticker)!.push(s);
+    const sig: Signal = { ...s, group: s.group ?? inferGroup(s.source) };
+    if (!byTicker.has(sig.ticker)) byTicker.set(sig.ticker, []);
+    byTicker.get(sig.ticker)!.push(sig);
   }
 
   const ranked: RankedSignal[] = [];
@@ -55,6 +104,21 @@ export async function signalRankHandler(raw: unknown) {
       .filter((s) => s.detail)
       .sort((a, b) => b.confidence - a.confidence)[0]?.detail ?? null;
 
+    const groups = new Set<Group>();
+    const channels = new Set<string>();
+    for (const s of deduped) {
+      groups.add(s.group as Group);
+      channels.add(`${s.group}:${s.source}`);
+    }
+    const thesisBonus = groups.has("THESIS") ? 20 : 0;
+
+    const earningsDays = args.earnings_within_days?.[ticker];
+    const ivTier = args.iv_tier_by_ticker?.[ticker];
+    const earningsPenalty = earningsDays !== undefined && earningsDays <= 7 && ivTier === "RED" ? 15 : 0;
+    const greenBonus = earningsDays !== undefined && earningsDays <= 14 && ivTier === "GREEN" ? 10 : 0;
+
+    const confluenceScore = groups.size * 10 + channels.size * 2 + thesisBonus + greenBonus - earningsPenalty;
+
     ranked.push({
       ticker,
       direction,
@@ -64,13 +128,24 @@ export async function signalRankHandler(raw: unknown) {
       top_detail: topDetail,
       raw_signals: deduped.map((s) => ({
         source: s.source,
+        group: s.group as Group,
         confidence: s.confidence,
         direction: s.direction,
       })),
+      confluence_score: confluenceScore,
+      tier: tierOf(confluenceScore),
+      groups_hit: groups.size,
+      channels_hit: channels.size,
+      thesis_bonus: thesisBonus,
+      earnings_penalty: earningsPenalty,
+      green_bonus: greenBonus,
     });
   }
 
-  ranked.sort((a, b) => b.composite_confidence - a.composite_confidence);
+  ranked.sort((a, b) => {
+    if (b.confluence_score !== a.confluence_score) return b.confluence_score - a.confluence_score;
+    return b.composite_confidence - a.composite_confidence;
+  });
   const results = ranked.slice(0, args.max_results);
 
   return {
@@ -82,12 +157,13 @@ export async function signalRankHandler(raw: unknown) {
   };
 }
 
-function dedupBySource(signals: z.infer<typeof SignalInput>[]): z.infer<typeof SignalInput>[] {
-  const seen = new Map<string, z.infer<typeof SignalInput>>();
+function dedupBySource(signals: Signal[]): Signal[] {
+  const seen = new Map<string, Signal>();
   for (const s of signals) {
-    const existing = seen.get(s.source);
+    const key = `${s.group}:${s.source}`;
+    const existing = seen.get(key);
     if (!existing || s.confidence > existing.confidence) {
-      seen.set(s.source, s);
+      seen.set(key, s);
     }
   }
   return [...seen.values()];
