@@ -36,6 +36,7 @@ import { RepricingCheckArgs, repricingCheckHandler } from "./tools/repricing-che
 import { ComboFillabilityArgs, comboFillabilityHandler } from "./tools/combo-fillability.js";
 import { ReconcileReminderArgs, reconcileReminderHandler } from "./tools/reconcile-reminder.js";
 import { ExpiryPriorityArgs, expiryPriorityHandler } from "./tools/expiry-priority.js";
+import { EarningsCalendarArgs, earningsCalendarHandler } from "./tools/earnings-calendar.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -119,6 +120,8 @@ const TOOLS = [
     inputSchema: toolInput(ReconcileReminderArgs, ["broker", "order_count", "session_at"]) },
   { name: "expiry_priority", description: "R8 expiry-day priority stack. Orders expiring legs ITM→ATM→OTM, then new-cycle writes. Flags violations when ITM/ATM legs present alongside new-cycle writes (must process rolls/closes first).",
     inputSchema: toolInput(ExpiryPriorityArgs, []) },
+  { name: "earnings_calendar", description: "Earnings calendar preload for held + watchlist tickers. Filters to tickers of interest, computes days_until + earnings_window (TODAY/WITHIN_2D/WITHIN_7D/WITHIN_14D), surfaces conflicting open option legs, and emits flags (R1 held-into-earnings, RED-tier IV crush warning, GREEN-tier candidate, SHORT-leg-thru-earnings). Returns earnings_within_days_map + iv_tier_map ready to feed signal_rank for confluence scoring.",
+    inputSchema: toolInput(EarningsCalendarArgs, ["as_of"]) },
   { name: "combo_fillability", description: "R14 BAG (multi-leg combo) fillability score. Rule-based heuristic: near-leg DTE/OI, underlying ADV, spot-to-near-strike distance, minutes-to-close, leg-width, net-price-vs-combo-mid. Returns HIGH/MEDIUM/LOW + suggestion (SUBMIT/REPRICE_MID/LEG_OUT/CANCEL) + leg_out_plan (BTC near @ ask + STO far @ bid) when LOW. Origin: BBAI 2026-04-23 $4P Apr-24/May-01 calendar roll (permId 2061124997) — 3 reprices $0.10→$0.05→$0.00 zero fill → canceled → forced assignment. Fix: leg out at T-60, not reprice down.",
     inputSchema: toolInput(ComboFillabilityArgs, ["ticker", "legs", "net_price"]) },
 ];
@@ -200,6 +203,7 @@ async function main() {
         case "reconcile_reminder": result = await reconcileReminderHandler(req.params.arguments); break;
         case "expiry_priority": result = await expiryPriorityHandler(req.params.arguments); break;
         case "combo_fillability": result = await comboFillabilityHandler(req.params.arguments); break;
+        case "earnings_calendar": result = await earningsCalendarHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
