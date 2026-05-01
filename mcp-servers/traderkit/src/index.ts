@@ -41,6 +41,11 @@ import { RviGapArgs, rviGapHandler } from "./tools/rvi-gap.js";
 import { ClassifyTradeOutcomeArgs, classifyTradeOutcomeHandler } from "./tools/classify-trade-outcome.js";
 import { MacroOverlayArgs, macroOverlayHandler } from "./tools/macro-overlay.js";
 import { BacktestSignalsArgs, backtestSignalsHandler } from "./tools/backtest-signals.js";
+import { MonitorPositionArgs, monitorPositionHandler } from "./tools/monitor-position.js";
+import { FetchFlowArgs, fetchFlowHandler } from "./tools/fetch-flow.js";
+import { FetchOiChangesArgs, fetchOiChangesHandler } from "./tools/fetch-oi-changes.js";
+import { FlowAnalysisArgs, flowAnalysisHandler } from "./tools/flow-analysis.js";
+import { DiscoverFlowArgs, discoverFlowHandler } from "./tools/discover-flow.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -136,6 +141,16 @@ const TOOLS = [
     inputSchema: toolInput(EarningsCalendarArgs, ["as_of"]) },
   { name: "combo_fillability", description: "R14 BAG (multi-leg combo) fillability score. Rule-based heuristic: near-leg DTE/OI, underlying ADV, spot-to-near-strike distance, minutes-to-close, leg-width, net-price-vs-combo-mid. Returns HIGH/MEDIUM/LOW + suggestion (SUBMIT/REPRICE_MID/LEG_OUT/CANCEL) + leg_out_plan (BTC near @ ask + STO far @ bid) when LOW. Origin: BBAI 2026-04-23 $4P Apr-24/May-01 calendar roll (permId 2061124997) — 3 reprices $0.10→$0.05→$0.00 zero fill → canceled → forced assignment. Fix: leg out at T-60, not reprice down.",
     inputSchema: toolInput(ComboFillabilityArgs, ["ticker", "legs", "net_price"]) },
+  { name: "monitor_position", description: "Classify a short-options position into GREEN/YELLOW/ORANGE/RED/CRITICAL tier from current spot+|delta| vs thresholds (worst-of spot tier and delta tier). Defaults supplied for short_call/covered_call and short_put/cash_secured_put; override via thresholds arg. Returns action enum (hold/flag/alarm/urgent/stop_everything), alert message template (🟢/🟡/🟠/🔴/🚨), deltas vs fill (spot/Δ/IV/buffer), buffer_otm, dte, next_review_dte gate (14/7/3/1), warnings (ITM, ≤1 DTE non-GREEN, expiry-day). Caller fetches current spot/Δ via UW MCP or TS option-quotes. Origin: AAPL 295C 5/22 cron monitor flow.",
+    inputSchema: toolInput(MonitorPositionArgs, ["position_id", "ticker", "structure", "strike", "expiry", "contracts", "fill_price", "current_spot", "current_delta"]) },
+  { name: "fetch_flow", description: "Dark-pool + options flow analysis for a ticker via Unusual Whales. Fetches per-day darkpool prints over N trading days (always includes today if trading day, even intraday). Classifies trades by NBBO mid → buy/sell volume → ACCUMULATION/DISTRIBUTION/NEUTRAL/UNKNOWN/NO_DATA + 0-100 strength. Aggregates options flow alerts → BULLISH/BEARISH/NEUTRAL bias from call/put premium. INTRADAY INTERPOLATION: when run during market hours, today's partial data is volume-weighted projected to full-day estimate (HIGH/MEDIUM/LOW/VERY_LOW confidence based on % of day elapsed). Combined signal: STRONG_BULLISH_CONFLUENCE / STRONG_BEARISH_CONFLUENCE / DP_*_ONLY / OPTIONS_*_ONLY / NO_SIGNAL. Source: ported from radon scripts/fetch_flow.py.",
+    inputSchema: toolInput(FetchFlowArgs, ["ticker"]) },
+  { name: "fetch_oi_changes", description: "Fetch open-interest changes from Unusual Whales (per-ticker or market-wide). Categorizes each OI change row into MASSIVE (≥$10M premium) / LARGE (≥$5M) / SIGNIFICANT (≥$1M) / MODERATE, BULLISH/BEARISH (call vs put inferred from OCC symbol), CLOSING-prefixed when oi_diff<0, LEAP flag when expiry year is 2027/2028. Returns total_count, total_oi_change, total_premium, massive_count, plus categorized data[]. Use to surface institutional positioning that flow-alerts may miss. Source: ported from radon scripts/fetch_oi_changes.py.",
+    inputSchema: toolInput(FetchOiChangesArgs, []) },
+  { name: "flow_analysis", description: "Broker-agnostic per-position flow classification. Takes positions[] (ticker, direction LONG/SHORT/BUY/SELL/DEBIT/CREDIT, structure label) → fetches darkpool flow per ticker → analyzes signal (score, sustained_days, recent vs aggregate direction conflict, options conflict, num_prints adequacy) → categorizes each position into supports / against / watch / neutral. Returns analysis_time, supports[], against[], watch[], neutral[], errors[] all sorted by strength desc. Source: ported from radon scripts/flow_analysis.py + scanner.py analyze_signal — broker-agnostic (no portfolio.json dependency).",
+    inputSchema: toolInput(FlowAnalysisArgs, ["positions"]) },
+  { name: "discover_flow", description: "Discover edge candidates via dark-pool + options-flow confluence (UW). Modes: market (fetch market-wide flow alerts ≥ min_premium → aggregate per ticker → DP-validate top tickers) or targeted (per-ticker flow + DP scan over a fixed list). Score 0-100 weighted: dp_strength 30 + dp_sustained 20 + confluence 20 + vol_oi 15 + sweeps 15. Vol/OI tiers: ≤1.0→0, 1-2→0-50, 2-4→50-100, >4→100. Sweep tiers: 0/1/≥2 → 0/50/100. Excludes indices (SPX/NDX/RUT/VIX/DJX/OEX/XSP) by default + caller-supplied excluded_tickers. Returns ranked candidates[] w/ score breakdown, dp metrics, options bias, sustained days. Source: ported from radon scripts/discover.py.",
+    inputSchema: toolInput(DiscoverFlowArgs, []) },
 ];
 
 const SECRETS = [
@@ -220,6 +235,11 @@ async function main() {
         case "classify_trade_outcome": result = await classifyTradeOutcomeHandler(req.params.arguments); break;
         case "macro_overlay": result = await macroOverlayHandler(req.params.arguments); break;
         case "backtest_signals": result = await backtestSignalsHandler(req.params.arguments); break;
+        case "monitor_position": result = await monitorPositionHandler(req.params.arguments); break;
+        case "fetch_flow":       result = await fetchFlowHandler(req.params.arguments); break;
+        case "fetch_oi_changes": result = await fetchOiChangesHandler(req.params.arguments); break;
+        case "flow_analysis":    result = await flowAnalysisHandler(req.params.arguments); break;
+        case "discover_flow":    result = await discoverFlowHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);

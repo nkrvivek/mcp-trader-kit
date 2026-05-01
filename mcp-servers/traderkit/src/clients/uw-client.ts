@@ -182,6 +182,169 @@ export async function uwIvRank(ticker: string): Promise<UWIvRank> {
   }
 }
 
+export interface UWDarkpoolTrade {
+  size: number;
+  price: number;
+  premium: number;
+  nbbo_bid: number;
+  nbbo_ask: number;
+  canceled: boolean;
+  executed_at?: string | undefined;
+  market_center?: string | undefined;
+  raw: Record<string, unknown>;
+}
+
+export async function uwDarkpoolFlow(
+  ticker: string,
+  opts: { date?: string; minPremium?: number; limit?: number } = {},
+): Promise<UWDarkpoolTrade[]> {
+  const T = ticker.toUpperCase();
+  const params: Record<string, string | number | undefined> = {};
+  if (opts.date) params.date = opts.date;
+  if (opts.minPremium !== undefined) params.min_premium = opts.minPremium;
+  if (opts.limit !== undefined) params.limit = opts.limit;
+  try {
+    const json = await uwGet(`/darkpool/${T}`, params);
+    return dataArray(json).map((r) => ({
+      size: toNum(r.size) ?? 0,
+      price: toNum(r.price) ?? 0,
+      premium: toNum(r.premium) ?? 0,
+      nbbo_bid: toNum(r.nbbo_bid) ?? 0,
+      nbbo_ask: toNum(r.nbbo_ask) ?? 0,
+      canceled: Boolean(r.canceled),
+      executed_at: r.executed_at != null ? String(r.executed_at) : undefined,
+      market_center: r.market_center != null ? String(r.market_center) : undefined,
+      raw: r,
+    }));
+  } catch (e) {
+    process.stderr.write(`traderkit: uwDarkpoolFlow(${T}) failed: ${toMessage(e)}\n`);
+    return [];
+  }
+}
+
+export interface UWFlowAlert {
+  ticker: string;
+  type: "CALL" | "PUT" | "";
+  is_call: boolean;
+  premium: number;
+  total_premium: number;
+  volume: number;
+  open_interest: number;
+  volume_oi_ratio: number;
+  has_sweep: boolean;
+  is_floor: boolean;
+  is_ask_side: boolean;
+  is_bid_side: boolean;
+  strike?: number | undefined;
+  expiry?: string | undefined;
+  underlying_price?: number | undefined;
+  marketcap?: number | undefined;
+  sector?: string | undefined;
+  issue_type?: string | undefined;
+  raw: Record<string, unknown>;
+}
+
+export async function uwFlowAlerts(opts: {
+  ticker?: string;
+  minPremium?: number;
+  maxPremium?: number;
+  isCall?: boolean;
+  isPut?: boolean;
+  isSweep?: boolean;
+  minDte?: number;
+  maxDte?: number;
+  minVolumeOiRatio?: number;
+  limit?: number;
+} = {}): Promise<UWFlowAlert[]> {
+  const params: Record<string, string | number | undefined> = {};
+  if (opts.ticker) params.ticker_symbol = opts.ticker.toUpperCase();
+  if (opts.minPremium !== undefined) params.min_premium = opts.minPremium;
+  if (opts.maxPremium !== undefined) params.max_premium = opts.maxPremium;
+  if (opts.isCall !== undefined) params.is_call = String(opts.isCall);
+  if (opts.isPut !== undefined) params.is_put = String(opts.isPut);
+  if (opts.isSweep !== undefined) params.is_sweep = String(opts.isSweep);
+  if (opts.minDte !== undefined) params.min_dte = opts.minDte;
+  if (opts.maxDte !== undefined) params.max_dte = opts.maxDte;
+  if (opts.minVolumeOiRatio !== undefined) params.min_volume_oi_ratio = opts.minVolumeOiRatio;
+  if (opts.limit !== undefined) params.limit = opts.limit;
+  try {
+    const json = await uwGet(`/option-trades/flow-alerts`, params);
+    return dataArray(json).map((r) => {
+      const t = String(r.type ?? "").toUpperCase();
+      const type: "CALL" | "PUT" | "" = t === "CALL" || t === "PUT" ? t : "";
+      return {
+        ticker: String(r.ticker ?? "").toUpperCase(),
+        type,
+        is_call: type === "CALL",
+        premium: toNum(r.premium) ?? 0,
+        total_premium: toNum(r.total_premium) ?? toNum(r.premium) ?? 0,
+        volume: toNum(r.volume) ?? 0,
+        open_interest: toNum(r.open_interest) ?? 0,
+        volume_oi_ratio: toNum(r.volume_oi_ratio) ?? 0,
+        has_sweep: Boolean(r.has_sweep),
+        is_floor: Boolean(r.is_floor),
+        is_ask_side: Boolean(r.is_ask_side),
+        is_bid_side: Boolean(r.is_bid_side),
+        strike: toNum(r.strike),
+        expiry: r.expiry != null ? String(r.expiry) : undefined,
+        underlying_price: toNum(r.underlying_price),
+        marketcap: toNum(r.marketcap),
+        sector: r.sector != null ? String(r.sector) : undefined,
+        issue_type: r.issue_type != null ? String(r.issue_type) : undefined,
+        raw: r,
+      };
+    });
+  } catch (e) {
+    process.stderr.write(`traderkit: uwFlowAlerts failed: ${toMessage(e)}\n`);
+    return [];
+  }
+}
+
+export interface UWOiChange {
+  option_symbol: string;
+  underlying_symbol: string;
+  oi_diff_plain: number;
+  curr_oi: number;
+  prev_oi: number;
+  prev_total_premium: number;
+  raw: Record<string, unknown>;
+}
+
+export async function uwStockOiChange(ticker: string): Promise<UWOiChange[]> {
+  const T = ticker.toUpperCase();
+  try {
+    const json = await uwGet(`/stock/${T}/oi-change`, {});
+    return dataArray(json).map(toOiChange);
+  } catch (e) {
+    process.stderr.write(`traderkit: uwStockOiChange(${T}) failed: ${toMessage(e)}\n`);
+    return [];
+  }
+}
+
+export async function uwMarketOiChange(): Promise<UWOiChange[]> {
+  try {
+    const json = await uwGet(`/market/oi-change`, {});
+    return dataArray(json).map(toOiChange);
+  } catch (e) {
+    process.stderr.write(`traderkit: uwMarketOiChange failed: ${toMessage(e)}\n`);
+    return [];
+  }
+}
+
+function toOiChange(r: Record<string, unknown>): UWOiChange {
+  const sym = String(r.option_symbol ?? "");
+  const underlying = String(r.underlying_symbol ?? sym.slice(0, 4));
+  return {
+    option_symbol: sym,
+    underlying_symbol: underlying,
+    oi_diff_plain: toNum(r.oi_diff_plain) ?? 0,
+    curr_oi: toNum(r.curr_oi) ?? 0,
+    prev_oi: toNum(r.prev_oi) ?? 0,
+    prev_total_premium: toNum(r.prev_total_premium) ?? 0,
+    raw: r,
+  };
+}
+
 export async function uwStockState(ticker: string): Promise<{ price?: number | undefined; change_pct?: number | undefined }> {
   const T = ticker.toUpperCase();
   try {
