@@ -18,7 +18,7 @@ npm install -g traderkit
 
 ## What it does
 
-Twenty-seven MCP tools that sit between your AI assistant and your broker:
+Thirty-one MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
@@ -52,6 +52,11 @@ Twenty-seven MCP tools that sit between your AI assistant and your broker:
 | `signal_rank` | Rank trading signals by composite confidence with multi-source boosting |
 | `thesis_fit` | Score trade alignment to active theses (IN_THESIS/PARTIAL/OFF_THESIS/NO_THESIS_REF) |
 | `broker_route` | Classify broker routing: SNAPTRADE/TRADESTATION/MANUAL/DEFERRED |
+| **Flow signals (radon port)** | |
+| `fetch_flow` | Per-ticker darkpool + options flow over N trading days w/ combined signal (STRONG_BULLISH_CONFLUENCE / STRONG_BEARISH_CONFLUENCE / DP_*_ONLY / OPTIONS_*_ONLY / NO_SIGNAL) |
+| `fetch_oi_changes` | Per-ticker or market-wide OI change scanner w/ premium tiers (MASSIVE ≥$10M / LARGE ≥$5M / SIGNIFICANT ≥$1M / MODERATE) and bias (STRONGLY_BULLISH / BULLISH / NEUTRAL / BEARISH / STRONGLY_BEARISH) |
+| `flow_analysis` | Position-aware classifier: routes positions into supports / against / watch / neutral against current flow direction (broker-agnostic — takes positions[] input) |
+| `discover_flow` | Market-mode + targeted-mode candidate discovery; scoring weights dp_strength=30, dp_sustained=20, confluence=20, vol_oi=15, sweeps=15 |
 | **Session management** | |
 | `list_profiles` | List configured trading profiles |
 | `set_profile` | Set the active profile for the session |

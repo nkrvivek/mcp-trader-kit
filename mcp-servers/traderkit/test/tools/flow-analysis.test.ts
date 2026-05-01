@@ -129,6 +129,21 @@ describe("flowAnalysisHandler", () => {
     expect(r.watch.length + r.neutral.length).toBeGreaterThan(0);
   });
 
+  it("classifies MODERATE conflicting recent as watch (radon parity)", async () => {
+    // strength 70 - 30 (conflict penalty) = 40 → MODERATE
+    const flow = mkFlow();
+    flow.dark_pool.aggregate.flow_strength = 70;
+    flow.dark_pool.aggregate.num_prints = 200;
+    flow.dark_pool.daily[0]!.flow_direction = "DISTRIBUTION";
+    const r = await flowAnalysisHandler(
+      { positions: [{ ticker: "AAPL", direction: "LONG" }] },
+      { fetchFlow: async () => flow },
+    );
+    expect(r.watch).toHaveLength(1);
+    expect(r.watch[0]!.signal).toBe("MODERATE");
+    expect(r.supports).toHaveLength(0);
+  });
+
   it("includes daily_buy_ratios sorted ascending by date", async () => {
     const r = await flowAnalysisHandler(
       { positions: [{ ticker: "AAPL", direction: "LONG" }] },

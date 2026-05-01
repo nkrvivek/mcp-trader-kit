@@ -52,8 +52,12 @@ async function uwGet(path: string, params: Record<string, string | number | unde
     });
     const body = await res.text();
     if (!res.ok) {
-      if (res.status >= 500 && attempt < maxAttempts - 1) {
-        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      if ((res.status === 429 || res.status >= 500) && attempt < maxAttempts - 1) {
+        const delay =
+          res.status === 429
+            ? Number(res.headers.get("Retry-After") ?? 0) * 1000 || 1000 * (attempt + 1)
+            : 300 * (attempt + 1);
+        await new Promise((r) => setTimeout(r, delay));
         continue;
       }
       throw new Error(`UW ${res.status} ${path}: ${sanitizeBody(body, token)}`);
@@ -275,7 +279,7 @@ export async function uwFlowAlerts(opts: {
       return {
         ticker: String(r.ticker ?? "").toUpperCase(),
         type,
-        is_call: type === "CALL",
+        is_call: type === "CALL" || Boolean(r.is_call),
         premium: toNum(r.premium) ?? 0,
         total_premium: toNum(r.total_premium) ?? toNum(r.premium) ?? 0,
         volume: toNum(r.volume) ?? 0,

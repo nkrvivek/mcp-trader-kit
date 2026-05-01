@@ -99,18 +99,19 @@ function classify(
   const isShort = pos.direction === "SHORT" || pos.direction === "SELL" || pos.direction === "CREDIT";
 
   let category: FlowCategory = "neutral";
+  const recentConflict =
+    recent_direction !== flowDir
+    && (recent_direction === "ACCUMULATION" || recent_direction === "DISTRIBUTION")
+    && (flowDir === "ACCUMULATION" || flowDir === "DISTRIBUTION");
   if (signal === "STRONG" || signal === "MODERATE") {
     const supportsLong = flowDir === "ACCUMULATION";
     const supportsShort = flowDir === "DISTRIBUTION";
-    if ((isLong && supportsLong) || (isShort && supportsShort)) category = "supports";
+    if (signal === "MODERATE" && recentConflict) {
+      category = "watch";
+    } else if ((isLong && supportsLong) || (isShort && supportsShort)) category = "supports";
     else if ((isLong && supportsShort) || (isShort && supportsLong)) category = "against";
     else category = "neutral";
-  } else if (
-    signal === "WEAK"
-    && (flowDir === "ACCUMULATION" || flowDir === "DISTRIBUTION")
-    && recent_direction !== flowDir
-    && (recent_direction === "ACCUMULATION" || recent_direction === "DISTRIBUTION")
-  ) {
+  } else if (signal === "WEAK" && recentConflict) {
     category = "watch";
   }
 
