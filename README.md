@@ -4,7 +4,7 @@
 [![CI](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml/badge.svg)](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Risk-gate MCP server for AI-assisted trading. 28 tools that enforce caps, wash-sale rules, regime-based sizing, execution-discipline rules (R0–R8, R14), and portfolio analysis — plus options screening, 13F smart-money tracking, and activist-filing surveillance — before any order hits your broker.
+Risk-gate MCP server for AI-assisted trading. 32 tools that enforce caps, wash-sale rules, regime-based sizing, execution-discipline rules (R0–R8, R14), portfolio analysis, and darkpool / options-flow signals — plus options screening, 13F smart-money tracking, and activist-filing surveillance — before any order hits your broker.
 
 Built for [Claude Code](https://claude.ai/claude-code). Works with any MCP client.
 
@@ -47,6 +47,7 @@ AI Assistant ──PreToolUse hook──► traderkit MCP (23 tools)
 | **Options screening + rolls** | `screen_options`, `calc_roll`, `calc_max_pain` |
 | **Fundamentals + smart-money** | `fmp_fundamentals`, `inst_holdings`, `track_activists` |
 | **Proposal + tax** | `propose_trade`, `track_tax`, `signal_rank`, `thesis_fit`, `broker_route`, `explain_payoff` |
+| **Flow signals (radon port)** | `fetch_flow`, `fetch_oi_changes`, `flow_analysis`, `discover_flow` |
 | **Session management** | `list_profiles`, `set_profile`, `trading_calendar`, `session_write`, `report_trades` |
 
 ## Execution discipline rules (R0–R8, R14)
