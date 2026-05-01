@@ -51,6 +51,26 @@ mcp__traderkit__classify_holding(
 
 Tags each: CORE | OPPORTUNISTIC | SPECULATIVE | PURE_SPECULATIVE.
 
+## Held-position flow scan (UW — radon port)
+
+Skip if `UW_TOKEN` unset → emit `[DEGRADED] UW_TOKEN missing · flow scan skipped`.
+
+Position-aware classifier across all held tickers in one call:
+
+```
+mcp__traderkit__flow_analysis(
+  positions=<from-snaptrade-positions>,    # [{ticker, direction, structure}]
+  lookback_trading_days=5
+)
+```
+
+Returns 4 buckets: `supports[]` / `against[]` / `watch[]` / `neutral[]`.
+
+- **`against[]`** → surface as 🔴 in dashboard ("flow contradicts position direction"). Phase 4 may flag for defensive review.
+- **`watch[]`** → MODERATE flow w/ recent-day conflict OR WEAK w/ conflict. Surface as 🟡 ("flow flipping").
+- **`supports[]`** → ✅ thesis tailwind. Carry confluence into Phase 4 boost.
+- **`neutral[]`** → no actionable flow. Silent.
+
 ## Freshness
 
 If last session doc in vault <4h old AND no `--force-fresh`, skip full refresh; reuse cached NAV.
@@ -61,6 +81,9 @@ If last session doc in vault <4h old AND no `--force-fresh`, skip full refresh; 
 Data: NAV $<nav> · δ $<delta> since <last-session-time> · <n-positions> positions
 Concentration: <n-at-cap> AT-CAP · HHI <score>
   OVER-CAP: <ticker1> (<pct>% vs <cap>%), <ticker2> (...)   ← if any
+Flow: <n-supports> ✅ · <n-watch> 🟡 · <n-against> 🔴 · <n-neutral> ─
+  🔴 against: <ticker> <signal> <flow_dir> — <note>           ← if any
+  🟡 watch:   <ticker> <signal> <flow_dir>↔<recent_dir>       ← if any
 ```
 
 ## Failure modes

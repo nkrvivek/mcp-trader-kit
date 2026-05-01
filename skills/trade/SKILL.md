@@ -20,9 +20,9 @@ description: Portfolio refresh + trade proposal + risk gate pipeline powered by 
 
 ```
 Phase 1: BOOT       profile load + regime gate
-Phase 2: REFRESH    broker data (SnapTrade/TS MCP) + risk read
-Phase 3: DISCOVER   FMP earnings + SEC activists + 13F smart-money (optional)
-Phase 4: PROPOSE    traderkit tools assemble + size + check
+Phase 2: REFRESH    broker data (SnapTrade/TS MCP) + risk read + held-position flow scan
+Phase 3: DISCOVER   FMP earnings + SEC activists + 13F smart-money + UW darkpool/options-flow (radon port)
+Phase 4: PROPOSE    traderkit tools assemble + size + flow-confluence tag + check
 Phase 5: PERSIST    session doc write (vault optional)
 ```
 
@@ -38,7 +38,7 @@ Phase 5: PERSIST    session doc write (vault optional)
 
 ## Required MCP servers
 
-- **traderkit** (this repo) — 23 risk + sizing tools
+- **traderkit** (this repo) — 32 risk + sizing + flow-signal tools
 - **snaptrade-trade-mcp** — portfolio reads (Fidelity, Robinhood, E-Trade, IBKR, Schwab)
 - **snaptrade-trade-mcp** — broker execution (optional, only for `--mode interactive`)
 
@@ -55,6 +55,7 @@ Optional:
 | `SNAPTRADE_*` | SnapTrade credentials (see main README) |
 | `FMP_API_KEY` | For Phase 3 earnings + fundamentals |
 | `SEC_USER_AGENT` | For Phase 3 activist filings (`"your-app contact: you@example.com"`) |
+| `UW_TOKEN` | For Phase 2 held-position flow scan + Phase 3 darkpool/options-flow discovery (UnusualWhales) |
 
 ## Profile schema
 

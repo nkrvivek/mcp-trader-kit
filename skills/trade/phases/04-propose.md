@@ -1,6 +1,6 @@
 # Phase 4 — PROPOSE (assemble + risk-check)
 
-**Inputs:** positions, regime, catalyst_map, earnings_map, event_map, inst_holdings_map
+**Inputs:** positions, regime, catalyst_map, earnings_map, event_map, inst_holdings_map, flow_candidates, oi_change_map, flow_analysis (held)
 **Outputs:** ranked proposal list
 
 ## Step 1: Short-option roll screen (if any short legs held)
@@ -48,10 +48,20 @@ For each candidate ticker, compute tags from Phase 3 maps:
 | ≥3 KNOWN_FUNDS accumulating | `[SMART-MONEY-ACCUMULATING]` | +0.25 |
 | ≥3 KNOWN_FUNDS trimming | `[SMART-MONEY-DISTRIBUTING]` | −0.25 |
 | Earnings ≤45d AND short-premium structure | `[EARN-BLACKOUT]` | auto-defer |
+| Flow `STRONG_BULLISH_CONFLUENCE` (DP accumulation + options bullish) | `[FLOW-CONFLUENCE-BULLISH]` | +0.4 |
+| Flow `STRONG_BEARISH_CONFLUENCE` (DP distribution + options bearish) | `[FLOW-CONFLUENCE-BEARISH]` | −0.4 |
+| Flow `DP_ACCUMULATION_ONLY` w/ score ≥60 | `[DP-ACCUMULATION]` | +0.2 |
+| Flow `DP_DISTRIBUTION_ONLY` w/ score ≥60 | `[DP-DISTRIBUTION]` | −0.2 |
+| OI-change premium_tier ∈ {MASSIVE, LARGE} bullish | `[OI-SURGE-BULL]` | +0.25 |
+| OI-change premium_tier ∈ {MASSIVE, LARGE} bearish | `[OI-SURGE-BEAR]` | −0.25 |
+| Held position flow_analysis category=`against` | `[FLOW-AGAINST]` | defensive-review only |
+| Held position flow_analysis category=`watch` (MODERATE+conflict or WEAK+conflict) | `[FLOW-WATCH]` | reduce size 50% |
 
 Conflict rules:
 - Fresh 13D overrides DISTRIBUTING on structure choice
-- EARN-BLACKOUT always blocks short-premium regardless of activist tailwind
+- EARN-BLACKOUT always blocks short-premium regardless of activist or flow tailwind
+- `[FLOW-CONFLUENCE-BEARISH]` on a long-direction proposal → auto-downgrade to `[NO-TRADE]` (radon parity)
+- `[FLOW-AGAINST]` on a held position → surface defensive proposal (roll/close), not new entry
 
 ## Step 4: Signal rank
 
@@ -168,7 +178,8 @@ Reject proposals that fail hard gates. Surface warnings.
 
 ```
 Proposals ready: <n> candidates · <m> no-trade
-1. [CANDIDATE][ACTIVIST-CATALYST] <ticker> covered_call $<size> — <thesis>
-2. [ROLL] <ticker> <cur>→<new> +$<credit>/contract
-[NO-TRADE] <ticker> — <reason>
+1. [CANDIDATE][ACTIVIST-CATALYST][FLOW-CONFLUENCE-BULLISH] <ticker> covered_call $<size> — <thesis>
+2. [ROLL][FLOW-AGAINST] <ticker> <cur>→<new> +$<credit>/contract  ← defensive
+3. [CANDIDATE][DP-ACCUMULATION] <ticker> cash_secured_put $<size> — <thesis>
+[NO-TRADE] <ticker> — flow-conflict ([FLOW-CONFLUENCE-BEARISH] on long structure)
 ```
