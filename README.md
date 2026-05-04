@@ -48,6 +48,7 @@ AI Assistant ──PreToolUse hook──► traderkit MCP (23 tools)
 | **Fundamentals + smart-money** | `fmp_fundamentals`, `inst_holdings`, `track_activists` |
 | **Proposal + tax** | `propose_trade`, `track_tax`, `signal_rank`, `thesis_fit`, `broker_route`, `explain_payoff` |
 | **Flow signals (radon port)** | `fetch_flow`, `fetch_oi_changes`, `flow_analysis`, `discover_flow` |
+| **TradingAgents (debate synthesis)** | `aggregate_analyst_reports`, `synthesize_debate`, `risk_debate_3stance`, `reflect_trades` |
 | **Session management** | `list_profiles`, `set_profile`, `trading_calendar`, `session_write`, `report_trades` |
 
 ## Execution discipline rules (R0–R8, R14)
@@ -74,6 +75,19 @@ Codified from real incidents (see [BBAI Apr-17 post-mortem](https://github.com/n
 Every gate run writes an append-only audit line to `$TRADERKIT_HOME/gate_audit/YYYY-MM-DD.jsonl` with a sha256 hash chain (each row contains prev row's hash) — tampering is detectable.
 
 See the [npm package README](mcp-servers/traderkit/README.md) for detailed documentation of each tool.
+
+## TradingAgents tools
+
+Four deterministic Zod-schema transforms ported from [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) v0.2.4 patterns. These are pure-data tools — no LLM call inside the MCP. The "synthesis intelligence" lives in the agent that consumes the structured slot (see the [trade-refresh](https://github.com/nkrvivek/trade-refresh) agent layer); the tool just enforces the schema and validates inputs.
+
+| Tool | Input | Output |
+|---|---|---|
+| `aggregate_analyst_reports` | 4 markdown reports (fundamentals/market/news/sentiment) | `{signal_score 0-100, conflict_points[], confluence_summary, top_catalysts[], top_risks[]}` |
+| `synthesize_debate` | bull + bear arguments + ticker + context | `{verdict: BUY\|HOLD\|SELL, conviction 1-5, key_risks[], thesis_summary, position_sizing_notes}` |
+| `risk_debate_3stance` | proposal + portfolio_state + regime_tier + rules_text | `{aggressive, conservative, neutral} × {verdict, sizing} + consensus_verdict + size_multiplier` |
+| `reflect_trades` | `{lookback_days, book}` over closed trades | `{lessons[], r_rule_breaches[], pattern_drift_alerts[], revenge_roll_count}` |
+
+CI exercises `reflect_trades` against a representative weekly fixture (`test/fixtures/reflect-week.json` — 10 trades w/ R7 breaches, HALT-regime entry, 2-roll TECK, TLH loss) via the existing [`ci.yml`](.github/workflows/ci.yml) — 6 fixture assertions inside the 401-test suite.
 
 ## Slash-command skills
 

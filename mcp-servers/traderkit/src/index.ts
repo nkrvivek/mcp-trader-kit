@@ -46,6 +46,10 @@ import { FetchFlowArgs, fetchFlowHandler } from "./tools/fetch-flow.js";
 import { FetchOiChangesArgs, fetchOiChangesHandler } from "./tools/fetch-oi-changes.js";
 import { FlowAnalysisArgs, flowAnalysisHandler } from "./tools/flow-analysis.js";
 import { DiscoverFlowArgs, discoverFlowHandler } from "./tools/discover-flow.js";
+import { AggregateAnalystReportsArgs, aggregateAnalystReportsHandler } from "./tools/aggregate-analyst-reports.js";
+import { SynthesizeDebateArgs, synthesizeDebateHandler } from "./tools/synthesize-debate.js";
+import { RiskDebate3StanceArgs, riskDebate3StanceHandler } from "./tools/risk-debate-3stance.js";
+import { ReflectTradesArgs, reflectTradesHandler } from "./tools/reflect-trades.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -151,6 +155,14 @@ const TOOLS = [
     inputSchema: toolInput(FlowAnalysisArgs, ["positions"]) },
   { name: "discover_flow", description: "Discover edge candidates via dark-pool + options-flow confluence (UW). Modes: market (fetch market-wide flow alerts ≥ min_premium → aggregate per ticker → DP-validate top tickers) or targeted (per-ticker flow + DP scan over a fixed list). Score 0-100 weighted: dp_strength 30 + dp_sustained 20 + confluence 20 + vol_oi 15 + sweeps 15. Vol/OI tiers: ≤1.0→0, 1-2→0-50, 2-4→50-100, >4→100. Sweep tiers: 0/1/≥2 → 0/50/100. Excludes indices (SPX/NDX/RUT/VIX/DJX/OEX/XSP) by default + caller-supplied excluded_tickers. Returns ranked candidates[] w/ score breakdown, dp metrics, options bias, sustained days. Source: ported from radon scripts/discover.py.",
     inputSchema: toolInput(DiscoverFlowArgs, []) },
+  { name: "aggregate_analyst_reports", description: "Combine 4 analyst markdown reports (fundamentals/market/news/sentiment) into one structured signal feed. Returns signal_score 0-100, net_bias [-1,1], confluence_summary (STRONG_CONFLUENCE/WEAK/MIXED/INSUFFICIENT_DATA), conflict_points (cross-source disagreements), top_catalysts (extracted from news+fundamentals), top_risks (from sentiment+fundamentals). Deterministic — no LLM. Use to roll up Phase 3 analyst Tasks into one ranking input for Phase 4. Ported from TauricResearch/TradingAgents graph state aggregation.",
+    inputSchema: toolInput(AggregateAnalystReportsArgs, ["ticker"]) },
+  { name: "synthesize_debate", description: "Synthesize bull/bear researcher arguments into a structured verdict. Returns rating (Buy/Overweight/Hold/Underweight/Sell) + verdict (BUY/HOLD/SELL) + conviction 1-5 + key_risks[] + thesis_summary + position_sizing_notes. Scores each side by counting evidence markers (numeric claims, % changes, dates, R-rule citations, rebuttals). Respects context (HALT regime caps at Hold; sub-TIER-1 signal caps at Hold; r_violations force Hold). Deterministic. Ported from TauricResearch/TradingAgents research_manager (v0.2.4 ResearchPlan structured-output).",
+    inputSchema: toolInput(SynthesizeDebateArgs, ["ticker"]) },
+  { name: "risk_debate_3stance", description: "Run 3-stance risk debate (aggressive/conservative/neutral) over a candidate proposal. Returns each stance's {verdict, size_multiplier, argument, citations} plus consensus_verdict (APPROVE/MODIFY/BLOCK) + final size_multiplier. Hard blocks: R-violations, margin debit, over-cap concentration, HALT-regime opening buy, sub-TIER-1 signal score. Replaces TradingAgents 3-agent ping-pong w/ one deterministic call. Ported from TauricResearch/TradingAgents risk_mgmt/{aggressive,conservative,neutral}_debator.",
+    inputSchema: toolInput(RiskDebate3StanceArgs, ["proposal"]) },
+  { name: "reflect_trades", description: "Reflection harness over closed trades. Aggregates win-rate, P&L, R-rule breaches w/ counts + examples, revenge-roll patterns (≥2 rolls then LOSS), pattern-drift alerts (degrading win-rate, ticker concentration in losses, structure repeatedly losing, HALT-regime bypasses). Emits structured lessons[] w/ category + severity + evidence. Deterministic — caller passes closed-trades array (from session_write JSONs or vault journal). Ported from TauricResearch/TradingAgents graph/reflection.py + memory.py.",
+    inputSchema: toolInput(ReflectTradesArgs, []) },
 ];
 
 const SECRETS = [
@@ -240,6 +252,10 @@ async function main() {
         case "fetch_oi_changes": result = await fetchOiChangesHandler(req.params.arguments); break;
         case "flow_analysis":    result = await flowAnalysisHandler(req.params.arguments); break;
         case "discover_flow":    result = await discoverFlowHandler(req.params.arguments); break;
+        case "aggregate_analyst_reports": result = await aggregateAnalystReportsHandler(req.params.arguments); break;
+        case "synthesize_debate":         result = await synthesizeDebateHandler(req.params.arguments); break;
+        case "risk_debate_3stance":       result = await riskDebate3StanceHandler(req.params.arguments); break;
+        case "reflect_trades":            result = await reflectTradesHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
