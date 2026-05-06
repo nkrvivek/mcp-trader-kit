@@ -18,7 +18,7 @@ npm install -g traderkit
 
 ## What it does
 
-Thirty-one MCP tools that sit between your AI assistant and your broker:
+Thirty-two MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|
@@ -57,11 +57,108 @@ Thirty-one MCP tools that sit between your AI assistant and your broker:
 | `fetch_oi_changes` | Per-ticker or market-wide OI change scanner w/ premium tiers (MASSIVE ≥$10M / LARGE ≥$5M / SIGNIFICANT ≥$1M / MODERATE) and bias (STRONGLY_BULLISH / BULLISH / NEUTRAL / BEARISH / STRONGLY_BEARISH) |
 | `flow_analysis` | Position-aware classifier: routes positions into supports / against / watch / neutral against current flow direction (broker-agnostic — takes positions[] input) |
 | `discover_flow` | Market-mode + targeted-mode candidate discovery; scoring weights dp_strength=30, dp_sustained=20, confluence=20, vol_oi=15, sweeps=15 |
+| **LLM Trading Council (model-diverse synthesis)** | |
+| `llm_council` | Karpathy 3-stage council (independent analysis → cross-rank → chair synthesis) across multiple LLMs (Anthropic + OpenAI + Google). Returns structured `{verdict, conviction, consensus_met, agreement_score, pros[], cons[], recommendation, sizing_note, disagreement_points[], model_rankings, stage1_voices, stage1_verdict_tally}`. Tensor-Trade Skeptic-seat pattern: permanent contrarian seat counts toward consensus. |
 | **Session management** | |
 | `list_profiles` | List configured trading profiles |
 | `set_profile` | Set the active profile for the session |
 | `trading_calendar` | NYSE trading calendar: trading day checks, next/prev, last-of-month, count between |
 | `session_write` | Format session doc sections: executed table, deferred list, no-trade log, index row |
+
+### `llm_council`
+
+Model-diverse synthesis layer for high-conviction trade proposals. Ports the [karpathy/llm-council](https://github.com/karpathy/llm-council) 3-stage pattern (collect → cross-rank → chair synthesize) and combines it with the Tensor-Trade Skeptic-seat pattern (permanent contrarian seat).
+
+**Why:** role-based debates (bull/bear/PM) suffer when every "voice" runs on the same model — they share inductive biases. The council adds **model diversity** (Claude vs GPT vs Gemini) orthogonal to the role diversity. Both feed into the final decision.
+
+**Three-stage flow per proposal:**
+
+1. **Stage 1 — Independent analysis** (parallel, N seats). Each seat gets the candidate proposal + portfolio context + regime + thesis text + analyst reports + book rules. Returns structured envelope: `{thesis, supporting_points[], risks[], verdict: BUY|HOLD|SELL, confidence: HIGH|MED|LOW}`. Failed seats silently dropped.
+2. **Stage 2 — Cross-ranking** (parallel, N seats, anonymized). Each seat sees Stage-1 outputs labeled "Response A/B/C/…" (no model names) and ranks all by analytical quality. Format-enforced output: `FINAL RANKING:\n1. Response X\n2. …`. Acts as orthogonal quality signal.
+3. **Stage 3 — Chair synthesis** (single call). Chairman receives de-anonymized Stage-1 + Stage-2 rankings and emits the structured JSON verdict.
+
+**Output shape (Stage 3 chair JSON):**
+
+```json
+{
+  "verdict": "BUY|HOLD|SELL|DEFER",
+  "conviction": "LOW|MED|HIGH",
+  "consensus_met": true,
+  "agreement_score": 0.83,
+  "pros": ["…", "…"],
+  "cons": ["…", "…"],
+  "recommendation": "Single-sentence actionable recommendation.",
+  "sizing_note": "size×0.5 etc.",
+  "disagreement_points": [
+    {"topic": "Earnings risk", "bull_view": "…", "bear_view": "…", "models_split": {"bull": ["claude-opus-4-7"], "bear": ["gpt-5.1", "gemini-3-pro-preview"]}}
+  ],
+  "model_rankings": {"claude-opus-4-7": 1, "gpt-5.1": 2},
+  "stage1_voices": [{"seat": "…", "verdict": "…", "confidence": "…"}],
+  "stage1_verdict_tally": {"BUY": 1, "HOLD": 4, "SELL": 1},
+  "stage1_failures": [],
+  "council_size": 6
+}
+```
+
+**Consensus-threshold gating** (Tensor-Trade pattern): chair sets `verdict = "DEFER"` when fewer than `consensus_threshold` (config; default >50% of seats) Stage-1 voices align on the same verdict at HIGH/MED confidence. DEFER → proposal annotated read-only, downstream debate continues, PM may still APPROVE/REJECT but with explicit "council DEFER" flag.
+
+**Permanent Skeptic seat** (Tensor-Trade overlay): one seat receives the same Stage-1 candidate prompt PLUS a contrarian system overlay ("Bias toward the bearish case unless evidence is overwhelming. Verdict default is HOLD or SELL"). Counts in consensus + chair synthesis. Chair is instructed to weight Skeptic as a contrarian gut-check, not as one-of-N equal voices.
+
+**Stage-0 eligibility gates** (skip council, no LLM cost):
+
+- `regime_tier === "halt"` + `skip_under_halt: true` → `{skipped: true, skip_reason: "regime_halt"}`
+- `candidate.is_roll === true` + `skip_rolls: true` → `{skipped: true, skip_reason: "skip_rolls"}` (rolls have R1–R9 deterministic gates already)
+- `candidate.signal_rank < min_signal_rank` (default 40 = TIER-1 floor) → `{skipped: true, skip_reason: "below_tier1"}`
+
+**Failure handling:**
+
+- One Stage-1 seat fails → dropped, council proceeds with N-1 (Karpathy pattern)
+- All Stage-1 seats fail → `{degraded: true, reason: "all_models_failed"}`, downstream proceeds without council input
+- Stage-2 ranking parse fails → fall back to no-rank (chair sees raw responses)
+- Chair fails → returns Karpathy-style fallback `{verdict: "HOLD", recommendation: "Council chair unavailable"}` with `degraded: true`
+- 120s per-call timeout, no retry (one-shot, fail loud)
+
+**Provider routing:** direct SDKs (Anthropic Messages API + OpenAI Chat Completions + Google Gemini). No OpenRouter dependency. The internal `LlmCaller` is provider-routed, so adding a fourth provider = adding one client method.
+
+**Cost / latency** (validated 2026-05-05): 6-seat council × 3 stages × ~3K tokens/call ≈ **$0.15–0.50 per proposal**, **~25–30s wall time**. Cache TTL 4h at `cache/council-verdicts/{date}/{ticker}.json`. Per-run cap `max_council_runs: 5` (hard upper bound).
+
+**Inputs:**
+
+```typescript
+{
+  candidate: { ticker, structure, direction, qty, notional_usd, signal_rank, thesis_ref?, rationale, is_roll? },
+  regime_tier: "clear" | "caution" | "defensive" | "halt",
+  portfolio_context: string,
+  thesis_text?: string,
+  analyst_reports?: { fundamentals_md?, market_md?, news_md?, sentiment_md? },
+  council_seats: [{ model, provider: "anthropic"|"openai"|"google", stance: "neutral"|"skeptic" }, ...],
+  chairman_model: string,
+  chairman_provider: "anthropic" | "openai" | "google",
+  consensus_threshold?: number,    // default ceil(seats * 0.51)
+  skip_under_halt?: boolean,       // default true
+  skip_rolls?: boolean,            // default true
+  min_signal_rank?: number,        // default 40
+  max_tokens_per_call?: number,    // default 1500
+  cache_ttl_hours?: number,        // default 4
+}
+```
+
+**Recommended seat configuration** (5 neutral + 1 Skeptic, 3 providers):
+
+```yaml
+seats:
+  - {model: "claude-opus-4-7",      provider: "anthropic", stance: "neutral"}
+  - {model: "claude-sonnet-4-6",    provider: "anthropic", stance: "neutral"}
+  - {model: "gpt-5.1",              provider: "openai",    stance: "neutral"}
+  - {model: "gpt-4o",               provider: "openai",    stance: "neutral"}
+  - {model: "gemini-3-pro-preview", provider: "google",    stance: "neutral"}
+  - {model: "claude-sonnet-4-6",    provider: "anthropic", stance: "skeptic"}
+chairman_model: "gemini-3-pro-preview"
+chairman_provider: "google"
+consensus_threshold: 4    # >50% of 6
+```
+
+Chair anti-bias instruction (auto-injected): *"Where seats from one provider agree among themselves but seats from another provider disagree, weight the cross-provider dissent more heavily — assume your own provider may share blind spots."*
 
 ### `check_trade`
 
@@ -294,6 +391,9 @@ In Claude Code: ask "list profiles" to confirm the server is connected.
 |----------|----------|-------------|
 | `TRADERKIT_ROOT` | No | Config root (default: `~/.traderkit`) |
 | `TRADERKIT_FAIL_OPEN` | No | Set `true` to allow trades when server is unreachable (default: fail closed) |
+| `ANTHROPIC_API_KEY` | For `llm_council` | Anthropic Messages API key — used by `claude-opus-*` and `claude-sonnet-*` seats |
+| `OPENAI_API_KEY` | For `llm_council` | OpenAI Chat Completions API key — used by `gpt-5.x` and `gpt-4o` seats |
+| `GEMINI_API_KEY` | For `llm_council` | Google Gemini API key — used by `gemini-3-pro-preview` seat / chair. Required only if Google seats are configured |
 | `SNAPTRADE_CONSUMER_KEY` | For SnapTrade | SnapTrade credentials — used here for activity lookups (wash-sale, TLH) and by companion [snaptrade-trade-mcp](https://www.npmjs.com/package/snaptrade-trade-mcp) for trade execution |
 | `SNAPTRADE_USER_SECRET` | For SnapTrade | |
 | `SNAPTRADE_USER_ID` | For SnapTrade | |
@@ -304,6 +404,15 @@ In Claude Code: ask "list profiles" to confirm the server is connected.
 | `UW_API_KEY` | For options | Unusual Whales API key — used by `screen_options`, `calc_max_pain` |
 | `FINNHUB_API_KEY` | For options | Finnhub API key — used by `screen_options` (earnings calendar) |
 | `SEC_USER_AGENT` | No | SEC EDGAR User-Agent override (defaults to `traderkit-mcp research (contact: <email>)`) — SEC fair-use requires contact email |
+| `TS_CLIENT_ID` | For TradeStation | TradeStation OAuth app client_id (create at https://api.tradestation.com) |
+| `TS_CLIENT_SECRET` | If app is confidential | TradeStation OAuth app client_secret (omit for public/PKCE-style apps) |
+| `TS_REDIRECT_URI` | No | OAuth redirect URI; defaults to `http://localhost:5391/callback` (matches `ts-auth` listener) |
+| `TS_TOKEN_PATH` | No | Token cache path; defaults to `~/.config/traderkit/tradestation.json` (mode 0600) |
+| `TS_API_BASE` | No | API base; defaults to `https://api.tradestation.com/v3` |
+| `TS_AUTH_BASE` | No | Auth base; defaults to `https://signin.tradestation.com` |
+| `TS_SCOPES` | No | Authorize scopes; default `openid offline_access profile MarketData ReadAccount Trade` |
+| `TS_REDIRECT_PORT` | No | Local listener port for `ts-auth`; default `5391` |
+| `TS_AUDIENCE` | No | Authorize audience; default `https://api.tradestation.com` |
 
 ## How it works
 
@@ -321,6 +430,47 @@ Claude Code ──PreToolUse hook──► traderkit MCP
 - **Credential redaction.** All tool responses are scrubbed — any env secret substring (8+ chars) is replaced with `<REDACTED>`.
 - **Tax-entity pooling.** Wash-sale checks span all accounts with the same `tax_entity`. Personal brokerage + IRA = one pool. LLC = separate pool.
 
+## TradeStation (built-in)
+
+Five MCP tools that talk directly to the TradeStation v3 REST API with persistent OAuth — no claude.ai connector, no token-expiry breakage:
+
+| Tool | Purpose |
+|------|---------|
+| `ts_balances` | Account balances (cash, equity, BP, day-trade BP) for one or more `account_ids` |
+| `ts_positions` | Open positions w/ Symbol/Quantity/AvgPrice/MarketValue/UnrealizedPL |
+| `ts_quotes` | Real-time quotes for up to 50 symbols (incl. option contracts) |
+| `ts_orders` | Working/recent orders for one or more `account_ids` |
+| `ts_place_order` | Preview (default) or live order placement; live mode is **R6 human-gated** via `confirm_token: "PLACE-LIVE-ORDER"` |
+
+### One-time auth flow
+
+1. Create an OAuth app at https://api.tradestation.com — set redirect URI to `http://localhost:5391/callback` (or override via `TS_REDIRECT_URI`).
+2. Export credentials:
+   ```bash
+   export TS_CLIENT_ID="<your-client-id>"
+   export TS_CLIENT_SECRET="<your-client-secret>"   # only if your app is confidential
+   ```
+3. Run the OAuth helper — opens your browser, captures the auth code, exchanges for tokens, persists at `~/.config/traderkit/tradestation.json` (mode 0600):
+   ```bash
+   node dist/bin/ts-auth.js
+   ```
+   On success: `OK: token persisted to ~/.config/traderkit/tradestation.json`.
+
+After that, every `ts_*` tool call auto-refreshes the access token (60s leeway) and retries once on `401` by forcing a refresh. Refresh tokens rotate on every refresh and persist to disk.
+
+### Switching from the claude.ai TradeStation connector
+
+Replace `mcp__claude_ai_TradeStation__*` calls with `mcp__traderkit__ts_*` in any phase doc / agent prompt. Coverage parity for the read paths used in trade-refresh:
+
+| claude.ai connector tool | traderkit replacement |
+|---|---|
+| `get-balances-summary` / `get-balances-details` | `ts_balances` |
+| `get-positions-details` / `get-positions-summary` | `ts_positions` |
+| `get-quotes` / `get-option-quotes` | `ts_quotes` |
+| `get-orders-detailed` / `get-orders-overview` | `ts_orders` |
+| `confirm-order` | `ts_place_order` w/ `preview_only: true` (default) |
+| `place-order` | `ts_place_order` w/ `preview_only: false` + `confirm_token: "PLACE-LIVE-ORDER"` |
+
 ## Supported brokers
 
 Works with any broker connected via [SnapTrade](https://snaptrade.com/):
@@ -330,7 +480,7 @@ Works with any broker connected via [SnapTrade](https://snaptrade.com/):
 - IBKR (read + write)
 - Schwab (read + write)
 - Robinhood (read-only)
-- TradeStation (via separate [TradeStation MCP](https://github.com/anthropics/anthropic-cookbook/tree/main/misc/tradestation_mcp))
+- TradeStation (built-in — see above; no SnapTrade dependency)
 
 ## Full setup
 

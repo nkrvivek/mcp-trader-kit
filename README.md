@@ -4,7 +4,7 @@
 [![CI](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml/badge.svg)](https://github.com/nkrvivek/traderkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Risk-gate MCP server for AI-assisted trading. 32 tools that enforce caps, wash-sale rules, regime-based sizing, execution-discipline rules (R0–R8, R14), portfolio analysis, and darkpool / options-flow signals — plus options screening, 13F smart-money tracking, and activist-filing surveillance — before any order hits your broker.
+Risk-gate MCP server for AI-assisted trading. 33 tools that enforce caps, wash-sale rules, regime-based sizing, execution-discipline rules (R0–R8, R14), portfolio analysis, and darkpool / options-flow signals — plus options screening, 13F smart-money tracking, activist-filing surveillance, and a model-diverse LLM council (Anthropic + OpenAI + Google) that synthesizes a multi-provider verdict on TIER-1 candidates — before any order hits your broker.
 
 Built for [Claude Code](https://claude.ai/claude-code). Works with any MCP client.
 
@@ -49,6 +49,7 @@ AI Assistant ──PreToolUse hook──► traderkit MCP (23 tools)
 | **Proposal + tax** | `propose_trade`, `track_tax`, `signal_rank`, `thesis_fit`, `broker_route`, `explain_payoff` |
 | **Flow signals (radon port)** | `fetch_flow`, `fetch_oi_changes`, `flow_analysis`, `discover_flow` |
 | **TradingAgents (debate synthesis)** | `aggregate_analyst_reports`, `synthesize_debate`, `risk_debate_3stance`, `reflect_trades` |
+| **LLM Trading Council (model-diverse synthesis)** | `llm_council` |
 | **Session management** | `list_profiles`, `set_profile`, `trading_calendar`, `session_write`, `report_trades` |
 
 ## Execution discipline rules (R0–R8, R14)
@@ -88,6 +89,41 @@ Four deterministic Zod-schema transforms ported from [TauricResearch/TradingAgen
 | `reflect_trades` | `{lookback_days, book}` over closed trades | `{lessons[], r_rule_breaches[], pattern_drift_alerts[], revenge_roll_count}` |
 
 CI exercises `reflect_trades` against a representative weekly fixture (`test/fixtures/reflect-week.json` — 10 trades w/ R7 breaches, HALT-regime entry, 2-roll TECK, TLH loss) via the existing [`ci.yml`](.github/workflows/ci.yml) — 6 fixture assertions inside the 401-test suite.
+
+## LLM Trading Council
+
+`llm_council` ports the [karpathy/llm-council](https://github.com/karpathy/llm-council) 3-stage pattern (collect → cross-rank → chair synthesize) and combines it with the Tensor-Trade permanent-Skeptic-seat overlay. Provides **model diversity** (Anthropic + OpenAI + Google) orthogonal to TradingAgents' role diversity (bull/bear/PM).
+
+| Stage | What runs |
+|---|---|
+| **1. Independent analysis** | N seats in parallel produce structured `{thesis, supporting_points[], risks[], verdict, confidence}` envelopes. Failed seats silently dropped (Karpathy pattern). |
+| **2. Cross-ranking** | N seats rank Stage-1 outputs anonymized as "Response A/B/C/…" by analytical quality. Acts as orthogonal quality signal. |
+| **3. Chair synthesis** | Chair model returns structured JSON: `{verdict, conviction, consensus_met, agreement_score, pros[], cons[], recommendation, sizing_note, disagreement_points[], model_rankings, stage1_voices, stage1_verdict_tally, council_size}`. |
+
+**Stage-0 eligibility gates** (skip with no LLM cost): `regime_tier="halt"` (`skip_reason: regime_halt`), `is_roll=true` (`skip_rolls`), `signal_rank < 40` (`below_tier1`).
+
+**Consensus-threshold gating:** chair sets `verdict = "DEFER"` when fewer than `consensus_threshold` Stage-1 voices align on the same verdict at HIGH/MED confidence. DEFER preserves the verdict pipeline — downstream debate continues, PM may still APPROVE/REJECT, but with explicit "council DEFER" flag.
+
+**Recommended 6-seat config** (5 neutral + 1 Skeptic, 3 providers, Gemini chair):
+
+```yaml
+seats:
+  - {model: "claude-opus-4-7",      provider: "anthropic", stance: "neutral"}
+  - {model: "claude-sonnet-4-6",    provider: "anthropic", stance: "neutral"}
+  - {model: "gpt-5.1",              provider: "openai",    stance: "neutral"}
+  - {model: "gpt-4o",               provider: "openai",    stance: "neutral"}
+  - {model: "gemini-3-pro-preview", provider: "google",    stance: "neutral"}
+  - {model: "claude-sonnet-4-6",    provider: "anthropic", stance: "skeptic"}
+chairman_model: "gemini-3-pro-preview"
+chairman_provider: "google"
+consensus_threshold: 4   # >50% of 6
+```
+
+**Cost / latency** (validated 2026-05-05 on NTNX + AAPL synthetic): **~$0.15–0.50 per proposal** at 6 seats × 3 stages × ~3K tokens, **~25–30s wall time**. Cache TTL 4h at `cache/council-verdicts/{date}/{ticker}.json`. Per-run cap `max_council_runs: 5`.
+
+**Required env vars:** `ANTHROPIC_API_KEY` (Claude seats), `OPENAI_API_KEY` (GPT seats), `GEMINI_API_KEY` (Gemini seat / chair).
+
+See [npm package README](mcp-servers/traderkit/README.md#llm_council) for full input schema, output shape, and failure-handling matrix.
 
 ## Slash-command skills
 
