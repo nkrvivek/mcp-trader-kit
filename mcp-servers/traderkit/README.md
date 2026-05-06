@@ -18,7 +18,7 @@ npm install -g traderkit
 
 ## What it does
 
-Thirty-two MCP tools that sit between your AI assistant and your broker:
+Thirty-three MCP tools that sit between your AI assistant and your broker:
 
 | Tool | Purpose |
 |------|---------|

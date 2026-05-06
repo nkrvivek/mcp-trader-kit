@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// Load traderkit/.env. Node 20.12+ has built-in process.loadEnvFile — no dotenv dep.
+// Silently skip if file missing (env may already be exported in shell).
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+try {
+  const here = dirname(fileURLToPath(import.meta.url));
+  // dist/index.js → ../../../.env points to traderkit repo root .env
+  process.loadEnvFile(resolve(here, "../../../.env"));
+} catch {
+  // .env optional
+}
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -50,6 +61,12 @@ import { AggregateAnalystReportsArgs, aggregateAnalystReportsHandler } from "./t
 import { SynthesizeDebateArgs, synthesizeDebateHandler } from "./tools/synthesize-debate.js";
 import { RiskDebate3StanceArgs, riskDebate3StanceHandler } from "./tools/risk-debate-3stance.js";
 import { ReflectTradesArgs, reflectTradesHandler } from "./tools/reflect-trades.js";
+import { LlmCouncilArgs, llmCouncilHandler } from "./tools/llm-council.js";
+import { TsBalancesArgs, tsBalancesHandler } from "./tools/ts-balances.js";
+import { TsPositionsArgs, tsPositionsHandler } from "./tools/ts-positions.js";
+import { TsQuotesArgs, tsQuotesHandler } from "./tools/ts-quotes.js";
+import { TsOrdersArgs, tsOrdersHandler } from "./tools/ts-orders.js";
+import { TsPlaceOrderArgs, tsPlaceOrderHandler } from "./tools/ts-place-order.js";
 import { redact } from "./redact.js";
 
 function toolInput<S extends ZodRawShape>(
@@ -163,6 +180,18 @@ const TOOLS = [
     inputSchema: toolInput(RiskDebate3StanceArgs, ["proposal"]) },
   { name: "reflect_trades", description: "Reflection harness over closed trades. Aggregates win-rate, P&L, R-rule breaches w/ counts + examples, revenge-roll patterns (≥2 rolls then LOSS), pattern-drift alerts (degrading win-rate, ticker concentration in losses, structure repeatedly losing, HALT-regime bypasses). Emits structured lessons[] w/ category + severity + evidence. Deterministic — caller passes closed-trades array (from session_write JSONs or vault journal). Ported from TauricResearch/TradingAgents graph/reflection.py + memory.py.",
     inputSchema: toolInput(ReflectTradesArgs, []) },
+  { name: "ts_balances", description: "TradeStation account balances (cash, buying power, equity, P&L). Local OAuth — refresh token persisted at ~/.config/traderkit/tradestation.json, auto-refreshes on every call (no claude.ai connector dependency).",
+    inputSchema: toolInput(TsBalancesArgs, ["account_ids"]) },
+  { name: "ts_positions", description: "TradeStation positions (symbol, qty, avg price, market value, unrealized P&L) for one or more accounts. Local OAuth, auto-refresh.",
+    inputSchema: toolInput(TsPositionsArgs, ["account_ids"]) },
+  { name: "ts_quotes", description: "TradeStation real-time quotes (last/bid/ask/volume/prev close) for up to 50 symbols (equities + options). Local OAuth, auto-refresh.",
+    inputSchema: toolInput(TsQuotesArgs, ["symbols"]) },
+  { name: "ts_orders", description: "TradeStation open orders for one or more accounts (status, qty, filled, limit/stop, trade action, duration). Local OAuth, auto-refresh.",
+    inputSchema: toolInput(TsOrdersArgs, ["account_ids"]) },
+  { name: "ts_place_order", description: "Place a TradeStation order. Default preview_only=true returns confirmation only. To place live, set preview_only=false AND confirm_token='PLACE-LIVE-ORDER' (R6 human-gate). Supports Market/Limit/StopMarket/StopLimit + DAY/GTC/etc.",
+    inputSchema: toolInput(TsPlaceOrderArgs, ["account_id", "symbol", "quantity", "order_type", "trade_action"]) },
+  { name: "llm_council", description: "LLM Trading Council — model-diverse 3-stage debate (Karpathy llm-council pattern + Tensor-Trade Skeptic + DisagreementPoint extensions). Stage 1: 6 seats (Anthropic + OpenAI + Google mix, w/ permanent Skeptic) opine on candidate via structured envelope (thesis/supporting_points/risks/verdict/confidence). Stage 2: anonymized cross-rank by analytical quality. Stage 3: Gemini chair synthesizes final structured JSON (verdict/conviction/pros/cons/recommendation/sizing_note/disagreement_points/model_rankings) w/ consensus-threshold gating (DEFER if <N voices align). Eligibility gate: skips under HALT regime, skips rolls (R1-R9 deterministic gates suffice), TIER-1 only (signal_rank≥40). Requires ANTHROPIC_API_KEY + OPENAI_API_KEY + GEMINI_API_KEY. Cost ~$0.75-3/proposal. Direct provider routing — no OpenRouter dependency. Feeds Phase 4 research-manager T2 alongside bull/bear T1.",
+    inputSchema: toolInput(LlmCouncilArgs, ["candidate"]) },
 ];
 
 const SECRETS = [
@@ -256,6 +285,12 @@ async function main() {
         case "synthesize_debate":         result = await synthesizeDebateHandler(req.params.arguments); break;
         case "risk_debate_3stance":       result = await riskDebate3StanceHandler(req.params.arguments); break;
         case "reflect_trades":            result = await reflectTradesHandler(req.params.arguments); break;
+        case "ts_balances":     result = await tsBalancesHandler(req.params.arguments); break;
+        case "ts_positions":    result = await tsPositionsHandler(req.params.arguments); break;
+        case "ts_quotes":       result = await tsQuotesHandler(req.params.arguments); break;
+        case "ts_orders":       result = await tsOrdersHandler(req.params.arguments); break;
+        case "ts_place_order":  result = await tsPlaceOrderHandler(req.params.arguments); break;
+        case "llm_council":     result = await llmCouncilHandler(req.params.arguments); break;
         default: throw new Error(`unknown tool: ${req.params.name}`);
       }
       const safe = redact(result, SECRETS);
